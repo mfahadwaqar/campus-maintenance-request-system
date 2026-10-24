@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Officer dashboard | Campus Maintenance{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <p class="eyebrow">Officer</p>
+    <h1>Maintenance request queue</h1>
+    <p>Resident-submitted maintenance requests appear below.</p>
+    <form method="get" class="filter-form">
+        {% for field in filter_form %}
+            <div class="form-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+            </div>
+        {% endfor %}
+        <button type="submit">Filter requests</button>
+        <a href="{% url 'accounts:officer_dashboard' %}">Clear filters</a>
+    </form>
+    {% for message in messages %}
+        <p class="status-message">{{ message }}</p>
+    {% endfor %}
+    {% if reports %}
+        <div class="report-list">
+            {% for report in reports %}
+                <article class="report-row{% if report.status == 'REOPENED' %} report-row-highlight{% endif %}">
+                    <div>
+                        <h2><a href="{% url 'accounts:officer_report_detail' report.id %}">{{ report.title }}</a></h2>
+                        <p>
+                            Request #{{ report.id }} · {{ report.resident.get_full_name|default:report.resident.username }}
+                            · {{ report.category }} · {{ report.building }}
+                        </p>
+                    </div>
+                    <div class="report-actions">
+                        <span class="status">{{ report.get_status_display }}</span>
+                        {% if report.status == "REOPENED" %}
+                            <strong class="reopened-label">Reopened for follow-up</strong>
+                        {% endif %}
+                        {% if report.status == "SUBMITTED" %}
+                            <form method="post" action="{% url 'accounts:begin_report_review' report.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="version" value="{{ report.version }}">
+                                <button type="submit">Begin review</button>
+                            </form>
+                        {% elif report.status == "UNDER_REVIEW" or report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}
+                            {% if report.active_assignments %}
+                                <p>Assigned to: {{ report.active_assignments.0.technician.get_full_name|default:report.active_assignments.0.technician.username }}</p>
+                            {% endif %}
+                            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">
+                                {% if report.status == "UNDER_REVIEW" %}Assign technician{% else %}Reassign technician{% endif %}
+                            </a>
+                        {% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No maintenance requests have been submitted yet.</p>
+    {% endif %}
+    {% if page_obj.has_other_pages %}
+        <nav class="pagination" aria-label="Queue pages">
+            {% if page_obj.has_previous %}
+                <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+            {% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+            {% endif %}
+        </nav>
+    {% endif %}
+</section>
+{% endblock %}

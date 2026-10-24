@@ -1,0 +1,260 @@
+:root {
+    color-scheme: light;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #24313d;
+    background: #f3f5f7;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}
+
+a {
+    color: #205b86;
+}
+
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem max(1.25rem, calc((100vw - 70rem) / 2));
+    background: #fff;
+    border-bottom: 1px solid #d9e0e5;
+}
+
+.brand {
+    color: #24313d;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.user-label {
+    color: #53616c;
+}
+
+.inline-form {
+    display: inline;
+}
+
+button {
+    border: 0;
+    border-radius: 0.3rem;
+    padding: 0.65rem 1rem;
+    color: #fff;
+    background: #205b86;
+    font: inherit;
+    cursor: pointer;
+}
+
+.nav-button {
+    padding: 0;
+    color: #205b86;
+    background: transparent;
+}
+
+.page-content {
+    width: min(100% - 2rem, 70rem);
+    margin: 2rem auto;
+}
+
+.panel {
+    padding: clamp(1.25rem, 4vw, 2.25rem);
+    background: #fff;
+    border: 1px solid #d9e0e5;
+    border-radius: 0.5rem;
+}
+
+.page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.page-heading h1 {
+    overflow-wrap: anywhere;
+}
+
+.button-link {
+    display: inline-block;
+    border-radius: 0.3rem;
+    padding: 0.65rem 1rem;
+    color: #fff;
+    background: #205b86;
+    text-decoration: none;
+}
+
+.report-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px solid #d9e0e5;
+}
+
+.report-actions {
+    display: grid;
+    justify-items: start;
+    gap: 0.5rem;
+}
+
+.report-actions p {
+    margin: 0;
+}
+
+.filter-form {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 1.25rem 0;
+}
+
+.filter-form .form-field {
+    min-width: 10rem;
+    margin: 0;
+}
+
+.pagination {
+    justify-content: center;
+    padding: 1rem 0;
+}
+
+.pagination span {
+    color: #53616c;
+}
+
+.status-message {
+    padding: 0.7rem;
+    background: #edf5e8;
+    border-radius: 0.25rem;
+}
+
+.report-row h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.report-row p,
+.history-list p {
+    margin-bottom: 0;
+}
+
+.status {
+    align-self: flex-start;
+    border-radius: 1rem;
+    padding: 0.25rem 0.7rem;
+    background: #e8eef2;
+    white-space: nowrap;
+}
+
+.report-details {
+    display: grid;
+    grid-template-columns: minmax(9rem, 0.3fr) 1fr;
+    gap: 0.6rem 1rem;
+}
+
+.report-details dt {
+    color: #53616c;
+    font-weight: 600;
+}
+
+.report-details dd {
+    margin: 0;
+}
+
+.user-content {
+    overflow-wrap: anywhere;
+}
+
+.history-list li {
+    padding: 0.5rem 0;
+}
+
+.history-list span {
+    margin-left: 0.5rem;
+    color: #53616c;
+}
+
+.comment {
+    padding: 0.75rem 0;
+    border-top: 1px solid #d9e0e5;
+}
+
+.comment p:first-child {
+    margin-top: 0;
+}
+
+.master-summary {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f3f5f7;
+    border-left: 3px solid #205b86;
+}
+
+.report-row-highlight {
+    border-left: 4px solid #a65d16;
+    background: #fff8ef;
+}
+
+.reopened-label {
+    color: #8b4a0d;
+}
+
+.login-panel {
+    max-width: 28rem;
+    margin: 3rem auto;
+}
+
+.eyebrow {
+    margin: 0;
+    color: #53616c;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.form-field {
+    display: grid;
+    gap: 0.4rem;
+    margin: 1rem 0;
+}
+
+.form-field input {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid #aebbc5;
+    border-radius: 0.25rem;
+    font: inherit;
+}
+
+.error-message {
+    color: #9c2e2e;
+}
+
+@media (max-width: 38rem) {
+    .site-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .page-heading,
+    .report-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

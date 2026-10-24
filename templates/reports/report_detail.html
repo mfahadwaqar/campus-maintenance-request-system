@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Request #{{ report.id }} | Campus Maintenance{% endblock %}
+
+{% block content %}
+<article class="panel">
+    {% for message in messages %}
+        <p class="status-message">{{ message }}</p>
+    {% endfor %}
+    <p class="eyebrow">Request #{{ report.id }}</p>
+    <div class="page-heading">
+        <h1>{{ report.title }}</h1>
+        <span class="status">{{ report.get_status_display }}</span>
+    </div>
+    <dl class="report-details">
+        <dt>Category</dt><dd>{{ report.category }}</dd>
+        <dt>Building</dt><dd>{{ report.building }}</dd>
+        <dt>Room or location</dt><dd>{{ report.room_location }}</dd>
+        <dt>Requested urgency</dt><dd>{{ report.get_requested_urgency_display }}</dd>
+        <dt>Submitted</dt><dd>{{ report.created_at|date:"M j, Y, P" }}</dd>
+    </dl>
+    <h2>Description</h2>
+    <p class="user-content">{{ report.description|linebreaksbr }}</p>
+
+    {% if master_summary %}
+        <section class="master-summary">
+            <h2>Related master request</h2>
+            <p>Request #{{ master_summary.id }} · {{ master_summary.status }}</p>
+        </section>
+    {% endif %}
+
+    {% if report.photos.all %}
+        <h2>Photos</h2>
+        <ul>
+            {% for photo in report.photos.all %}
+                <li><a href="{% url 'reports:photo_download' report.id photo.id %}">{{ photo.get_stage_display }} photo</a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if verification_form %}
+        <section>
+            <h2>Verify completed work</h2>
+            <form method="post" action="{% url 'reports:verify' report.id %}">
+                {% csrf_token %}
+                {{ verification_form.version }}
+                <div class="form-field">
+                    {{ verification_form.rating.label_tag }}
+                    {{ verification_form.rating }}
+                </div>
+                <div class="form-field">
+                    {{ verification_form.comment.label_tag }}
+                    {{ verification_form.comment }}
+                </div>
+                <button type="submit">Verify request</button>
+            </form>
+        </section>
+        {% if reopen_form %}
+        <section>
+            <h2>Reopen request</h2>
+            <form method="post" action="{% url 'reports:reopen' report.id %}">
+                {% csrf_token %}
+                {{ reopen_form.version }}
+                <div class="form-field">
+                    {{ reopen_form.reason.label_tag }}
+                    {{ reopen_form.reason }}
+                </div>
+                <button type="submit">Reopen request</button>
+            </form>
+        </section>
+        {% endif %}
+    {% endif %}
+    {% if reopen_form and not verification_form %}
+        <section>
+            <h2>Reopen related request</h2>
+            <form method="post" action="{% url 'reports:reopen' report.id %}">
+                {% csrf_token %}
+                {{ reopen_form.version }}
+                <div class="form-field">
+                    {{ reopen_form.reason.label_tag }}
+                    {{ reopen_form.reason }}
+                </div>
+                <button type="submit">Reopen master request</button>
+            </form>
+        </section>
+    {% endif %}
+
+    <p><a href="{% url 'reports:history' report.id %}">View full status history</a></p>
+    {% include "reports/_comments.html" %}
+    <p><a href="{% url 'reports:list' %}">Back to requests</a></p>
+</article>
+{% endblock %}

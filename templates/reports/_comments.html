@@ -1,0 +1,28 @@
+<section class="comments">
+    <h2>Comments</h2>
+    {% for comment in comments %}
+        <article class="comment">
+            <p>
+                <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
+                · {{ comment.created_at|date:"M j, Y, P" }}
+                {% if comment.is_internal %}<span class="status">Internal</span>{% endif %}
+            </p>
+            <p class="user-content">{{ comment.body|linebreaksbr }}</p>
+        </article>
+    {% empty %}
+        <p>No comments yet.</p>
+    {% endfor %}
+    {% if comment_form %}
+        <form method="post" action="{% url 'reports:comments' report.id %}">
+            {% csrf_token %}
+            {% for field in comment_form %}
+                <div class="form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit">Add comment</button>
+        </form>
+    {% endif %}
+</section>

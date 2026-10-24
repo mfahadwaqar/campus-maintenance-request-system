@@ -1,0 +1,39 @@
+image: python:3.14-slim
+
+services:
+  - name: postgres:17-alpine
+    alias: postgres
+
+variables:
+  DJANGO_SETTINGS_MODULE: campus_maintainance_request_system.settings.prod
+  DJANGO_SECRET_KEY: ci-only-not-a-production-secret
+  DJANGO_ALLOWED_HOSTS: localhost
+  DJANGO_SECURE_SSL_REDIRECT: "false"
+  DJANGO_HSTS_SECONDS: "0"
+  POSTGRES_DB: campus_maintenance
+  POSTGRES_USER: campus
+  POSTGRES_PASSWORD: ci-test-password
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+
+test:
+  stage: test
+  before_script:
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements.txt
+    - >-
+      until python -c 'import os, psycopg;
+      psycopg.connect(host=os.environ["POSTGRES_HOST"],
+      dbname=os.environ["POSTGRES_DB"], user=os.environ["POSTGRES_USER"],
+      password=os.environ["POSTGRES_PASSWORD"], port=os.environ["POSTGRES_PORT"])';
+      do sleep 1; done
+  script:
+    - python manage.py migrate --noinput
+    - coverage run --source=accounts,reports,assignments,notifications,campus_maintainance_request_system manage.py test
+    - coverage report
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'

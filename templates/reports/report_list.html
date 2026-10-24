@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Maintenance requests | Campus Maintenance{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">Reports</p>
+            <h1>Maintenance requests</h1>
+        </div>
+        {% if user.role == "RESIDENT" %}
+            <a class="button-link" href="{% url 'reports:create' %}">Submit a request</a>
+        {% endif %}
+    </div>
+    {% if reports %}
+        <div class="report-list">
+            {% for report in reports %}
+                <article class="report-row">
+                    <div>
+                        <h2><a href="{% url 'reports:detail' report.id %}">{{ report.title }}</a></h2>
+                        <p>{{ report.category }} · {{ report.building }} · {{ report.created_at|date:"M j, Y" }}</p>
+                    </div>
+                    <span class="status">{{ report.get_status_display }}</span>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No maintenance requests to display.</p>
+        {% if user.role == "RESIDENT" %}
+            <p><a href="{% url 'reports:create' %}">Submit your first request</a>.</p>
+        {% endif %}
+    {% endif %}
+</section>
+{% endblock %}

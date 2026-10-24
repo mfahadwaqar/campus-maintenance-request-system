@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Comments · Request #{{ report.id }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <p class="eyebrow">Request #{{ report.id }}</p>
+    <h1>Comments</h1>
+    {% include "reports/_comments.html" %}
+    <a href="{% url 'reports:detail' report.id %}">Back to request</a>
+</section>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}History · Request #{{ report.id }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <p class="eyebrow">Request #{{ report.id }}</p>
+    <h1>Status history</h1>
+    <ol class="history-list">
+        {% for item in report.status_history.all %}
+            <li>
+                <strong>{{ item.get_new_status_display }}</strong>
+                <span>{{ item.changed_at|date:"M j, Y, P" }} · {{ item.changed_by.get_full_name|default:item.changed_by.username }}</span>
+                {% if item.note %}<p>{{ item.note }}</p>{% endif %}
+            </li>
+        {% empty %}
+            <li>No status updates yet.</li>
+        {% endfor %}
+    </ol>
+    {% if user.role == "OFFICER" %}
+        <a href="{% url 'accounts:officer_report_detail' report.id %}">Back to officer review</a>
+    {% elif user.role == "TECHNICIAN" %}
+        <a href="{% url 'assignments:technician_report_detail' report.id %}">Back to work order</a>
+    {% else %}
+        <a href="{% url 'reports:detail' report.id %}">Back to request</a>
+    {% endif %}
+</section>
+{% endblock %}

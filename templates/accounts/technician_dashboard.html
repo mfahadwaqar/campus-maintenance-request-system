@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Technician dashboard | Campus Maintenance{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <p class="eyebrow">Technician</p>
+    <h1>Your assigned work</h1>
+    {% if reports %}
+        <div class="report-list">
+            {% for report in reports %}
+                <article class="report-row">
+                    <div>
+                        <h2><a href="{% url 'assignments:technician_report_detail' report.id %}">{{ report.title }}</a></h2>
+                        <p>Request #{{ report.id }} · {{ report.category }} · {{ report.building }}</p>
+                    </div>
+                    <span class="status">{{ report.get_status_display }}</span>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>You have no active maintenance assignments.</p>
+    {% endif %}
+</section>
+{% endblock %}

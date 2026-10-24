@@ -1,0 +1,38 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Campus Maintenance{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'accounts/style.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{% url 'accounts:dashboard' %}">Campus Maintenance</a>
+        <nav aria-label="Main navigation">
+            {% if user.is_authenticated %}
+                {% if user.role == "RESIDENT" %}
+                    <a href="{% url 'accounts:resident_dashboard' %}">Dashboard</a>
+                    <a href="{% url 'reports:list' %}">Requests</a>
+                {% elif user.role == "OFFICER" %}
+                    <a href="{% url 'accounts:officer_dashboard' %}">Dashboard</a>
+                {% elif user.role == "TECHNICIAN" %}
+                    <a href="{% url 'accounts:technician_dashboard' %}">Dashboard</a>
+                {% endif %}
+                {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
+                <span class="user-label">{{ user.get_full_name|default:user.username }}</span>
+                <form class="inline-form" action="{% url 'accounts:logout' %}" method="post">
+                    {% csrf_token %}
+                    <button class="nav-button" type="submit">Log out</button>
+                </form>
+            {% else %}
+                <a href="{% url 'accounts:login' %}">Log in</a>
+            {% endif %}
+        </nav>
+    </header>
+    <main class="page-content">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
