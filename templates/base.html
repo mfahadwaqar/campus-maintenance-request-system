@@ -15,9 +15,9 @@
                 {% if user.role == "RESIDENT" %}
                     <a href="{% url 'accounts:resident_dashboard' %}">Dashboard</a>
                     <a href="{% url 'reports:list' %}">Requests</a>
-                {% elif user.role == "OFFICER" %}
+                {% elif user.role == "CALL_CENTER_STAFF" %}
                     <a href="{% url 'accounts:officer_dashboard' %}">Dashboard</a>
-                {% elif user.role == "TECHNICIAN" %}
+                {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
                     <a href="{% url 'accounts:technician_dashboard' %}">Dashboard</a>
                 {% endif %}
                 {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}

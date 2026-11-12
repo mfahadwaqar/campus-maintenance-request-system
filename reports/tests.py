@@ -4,12 +4,14 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
-from accounts.models import Building, User
-from .models import Category, Photo, Report, StatusHistory
+from accounts.models import Building, Unit, UnitKind, User
+from .models import Category, Comment, Photo, Report, StatusHistory
+from .services import add_comment
 
 
 def image_upload(
@@ -43,7 +45,7 @@ class ReportSubmissionTests(TestCase):
             role=User.Role.RESIDENT,
         )
         self.officer = User.objects.create_user(
-            username="officer", password="test-password", role=User.Role.OFFICER
+            username="officer", password="test-password", role=User.Role.CALL_CENTER_STAFF
         )
         self.client.force_login(self.resident)
 
@@ -55,7 +57,7 @@ class ReportSubmissionTests(TestCase):
         return {
             "category": str(self.category.pk),
             "building": str(self.building.pk),
-            "room_location": "Room 204",
+            "room_location": "A204",
             "title": "Leaking sink",
             "description": "Water is dripping under the sink.",
             "requested_urgency": "MEDIUM",
@@ -233,3 +235,112 @@ class ReportSubmissionTests(TestCase):
 
         self.assertContains(response, "&lt;script&gt;window.alert(1)&lt;/script&gt;")
         self.assertNotContains(response, "<script>window.alert(1)</script>")
+
+
+class CommentRulesTests(TestCase):
+    def setUp(self):
+        self.building = Building.objects.create(name="Comment Building")
+        self.category = Category.objects.create(name="Comment Category")
+        self.unit = Unit.objects.create(name="Comment Unit", kind=UnitKind.INTERNAL)
+        self.resident = User.objects.create_user(
+            username="comment_resident", password="test-password-only", role=User.Role.RESIDENT
+        )
+        self.staff = User.objects.create_user(
+            username="comment_staff", password="test-password-only", role=User.Role.CALL_CENTER_STAFF
+        )
+        self.worker = User.objects.create_user(
+            username="comment_worker", password="test-password-only",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.unit,
+        )
+
+    def make_report(self, status):
+        report = Report.objects.create(
+            ticket_no=f"CMR-2026-1-{Report.objects.count() + 1:06d}",
+            resident=self.resident,
+            category=self.category,
+            building=self.building,
+            room_location="A101",
+            title="Comment test",
+            description="Comment test",
+            channel="WEB",
+            status=Report.Status.SUBMITTED,
+        )
+        if status == Report.Status.CLOSED:
+            transitions = [
+                (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
+                (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
+                (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
+                (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
+                (Report.Status.CLOSED, User.Role.RESIDENT),
+            ]
+        elif status == Report.Status.COMPLETED:
+            transitions = [
+                (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
+                (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
+                (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
+                (status, User.Role.TECHNICIAN_CONTRACTOR),
+            ]
+        elif status == Report.Status.REOPENED:
+            transitions = [
+                (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
+                (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
+                (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
+                (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
+                (Report.Status.REOPENED, User.Role.RESIDENT),
+            ]
+        else:
+            transitions = [(status, User.Role.SYSTEM)]
+        with connection.cursor() as cursor:
+            current = Report.Status.SUBMITTED
+            for new_status, role in transitions:
+                cursor.execute(
+                    "SELECT set_config('app.current_user_role', %s, true)",
+                    [role],
+                )
+                cursor.execute(
+                    "UPDATE reports_report SET status = %s WHERE id = %s",
+                    [new_status, report.pk],
+                )
+                current = new_status
+        report.refresh_from_db()
+        return report
+
+    def test_completed_and_reopened_comments_succeed_and_resident_sets_flag(self):
+        for status in (Report.Status.COMPLETED, Report.Status.REOPENED):
+            with self.subTest(status=status):
+                report = self.make_report(status)
+                comment = add_comment(
+                    report_id=report.pk, author=self.resident, body="Resident update"
+                )
+                self.assertEqual(comment.kind, Comment.Kind.COMMENT)
+                report.refresh_from_db()
+                self.assertTrue(report.awaiting_call_center_response)
+
+    def test_staff_reply_clears_resident_flag(self):
+        report = self.make_report(Report.Status.COMPLETED)
+        add_comment(report_id=report.pk, author=self.resident, body="Resident update")
+        add_comment(report_id=report.pk, author=self.staff, body="Staff update")
+        report.refresh_from_db()
+        self.assertFalse(report.awaiting_call_center_response)
+
+    def test_closed_comment_is_refused_for_service_and_post(self):
+        report = self.make_report(Report.Status.CLOSED)
+        count = Comment.objects.filter(report=report).count()
+        with self.assertRaises(ValidationError):
+            add_comment(report_id=report.pk, author=self.resident, body="Too late")
+
+        self.client.force_login(self.resident)
+        response = self.client.post(
+            reverse("reports:comments", args=(report.pk,)),
+            {"body": "Direct post"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Comment.objects.filter(report=report).count(), count)
+
+    def test_comment_form_has_no_kind_field(self):
+        report = self.make_report(Report.Status.COMPLETED)
+        self.client.force_login(self.resident)
+        response = self.client.get(reverse("reports:detail", args=(report.pk,)))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="kind"')

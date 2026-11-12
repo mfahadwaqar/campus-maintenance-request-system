@@ -1,0 +1,21 @@
+{% extends "ps4/base.html" %}
+{% block title %}Findings{% endblock %}
+{% block content %}
+<h1>Findings</h1>
+<h2>Stakeholder interview</h2>
+<dl>
+  <dt>Date</dt><dd>{{ findings.stakeholder_interview.date }}</dd>
+  <dt>Mode</dt><dd>{{ findings.stakeholder_interview.mode }}</dd>
+  <dt>Participants</dt><dd>{{ findings.stakeholder_interview.participants|join:", " }}</dd>
+  <dt>Duration</dt><dd>{{ findings.stakeholder_interview.duration }}</dd>
+</dl>
+<table>
+  <thead><tr><th>Code</th><th>User class</th><th>Finding</th><th>Evidence type</th></tr></thead>
+  <tbody>{% for finding in findings.findings %}
+    <tr><td>{{ finding.code }}</td><td>{{ finding.user_class }}</td><td>{{ finding.finding }}</td><td>{{ finding.evidence_type }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+<p><strong>Student interviews:</strong> {{ findings.student_interviews }}</p>
+<p><strong>Call center interviews:</strong> {{ findings.call_center_interviews }}</p>
+<p><strong>Disagreements:</strong> {{ findings.disagreements }}</p>
+{% endblock %}

@@ -19,7 +19,7 @@ from .forms import AssignTechnicianForm
 
 
 def _officer_report_or_404(user, report_id):
-    if user.role != User.Role.OFFICER:
+    if user.role != User.Role.CALL_CENTER_STAFF:
         raise Http404
     return get_object_or_404(Report.objects.for_user(user), pk=report_id)
 
@@ -70,7 +70,7 @@ def assign_report(request, report_id):
 
 
 def _assigned_report_or_404(user, report_id):
-    if user.role != User.Role.TECHNICIAN:
+    if user.role != User.Role.TECHNICIAN_CONTRACTOR:
         raise Http404
     return get_object_or_404(
         Report.objects.for_user(user).filter(
@@ -92,7 +92,7 @@ def _technician_detail_context(user, report, completion_form=None):
         ),
         "version": report.version,
         "comments": Comment.objects.for_user(user, report).select_related("author"),
-        "comment_form": CommentForm(allow_internal=True),
+        "comment_form": CommentForm(),
     }
 
 
@@ -150,6 +150,7 @@ def complete_work_view(request, report_id):
             expected_version=form.cleaned_data["version"],
             completion_notes=form.cleaned_data["completion_notes"],
             photo=form.cleaned_data.get("photo"),
+            requester_signed_on_site=form.cleaned_data["requester_signed_on_site"],
         )
         messages.success(request, "Work marked as completed.")
     except ReportConflict as exc:

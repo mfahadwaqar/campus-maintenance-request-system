@@ -1,0 +1,16 @@
+{% extends "ps4/base.html" %}
+{% block title %}Problem Set 4 - Campus Maintenance Request System{% endblock %}
+{% block content %}
+<h1>Problem Set 4</h1>
+<p>Campus Maintenance Request System design review and progress report.</p>
+<ul>
+  <li><a href="{% url 'ps4:findings' %}">Findings</a></li>
+  <li><a href="{% url 'ps4:personas' %}">Personas</a></li>
+  <li><a href="{% url 'ps4:scenarios' %}">Scenarios</a></li>
+  <li><a href="{% url 'ps4:prototype' %}">Prototype and feedback</a></li>
+  <li><a href="{% url 'ps4:alternatives' %}">Alternatives</a></li>
+  <li><a href="{% url 'ps4:permissions' %}">Permissions</a></li>
+  <li><a href="{% url 'ps4:mvp' %}">MVP decisions</a></li>
+  <li><a href="{% url 'ps4:summary' %}">Summary</a></li>
+</ul>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "ps4/base.html" %}
+{% block title %}Scenarios{% endblock %}
+{% block content %}
+<h1>Scenarios</h1>
+{% for scenario in scenarios %}
+<section><h2><a href="{% url 'ps4:scenario_detail' slug=scenario.slug %}">{{ scenario.title }}</a></h2></section>
+{% endfor %}
+{% endblock %}

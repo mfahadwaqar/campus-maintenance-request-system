@@ -46,20 +46,7 @@ def report_detail(request, report_id):
         if report.status == Report.Status.COMPLETED:
             context["verification_form"] = VerificationForm(report=report)
             context["reopen_form"] = ReopenReportForm(report=report)
-        elif report.merged_into_id and report.merged_into.status == Report.Status.COMPLETED:
-            context["reopen_form"] = ReopenReportForm(report=report)
-    if (
-        request.user.role == User.Role.RESIDENT
-        and report.merged_into_id
-    ):
-        master = report.merged_into
-        context["master_summary"] = {
-            "id": master.pk,
-            "status": master.get_status_display(),
-        }
-    context["comment_form"] = CommentForm(
-        allow_internal=request.user.role in (User.Role.OFFICER, User.Role.TECHNICIAN)
-    )
+    context["comment_form"] = CommentForm()
     return render(request, "reports/report_detail.html", context)
 
 
@@ -71,7 +58,12 @@ def report_history(request, report_id):
         .prefetch_related("status_history__changed_by"),
         pk=report_id,
     )
-    return render(request, "reports/report_history.html", {"report": report})
+    comments = Comment.objects.for_user(request.user, report).select_related("author")
+    return render(
+        request,
+        "reports/report_history.html",
+        {"report": report, "comments": comments},
+    )
 
 
 @login_required
@@ -137,18 +129,13 @@ def reopen_report_view(request, report_id):
 def report_comments(request, report_id):
     report = get_object_or_404(Report.objects.for_user(request.user), pk=report_id)
     if request.method == "POST":
-        form = CommentForm(
-            request.POST,
-            allow_internal=request.user.role
-            in (User.Role.OFFICER, User.Role.TECHNICIAN),
-        )
+        form = CommentForm(request.POST)
         if form.is_valid():
             try:
                 add_comment(
                     report_id=report.pk,
                     author=request.user,
                     body=form.cleaned_data["body"],
-                    is_internal=form.cleaned_data.get("is_internal", False),
                 )
                 messages.success(request, "Comment added.")
             except ValidationError as exc:
@@ -163,10 +150,7 @@ def report_comments(request, report_id):
         {
             "report": report,
             "comments": comments,
-            "comment_form": CommentForm(
-                allow_internal=request.user.role
-                in (User.Role.OFFICER, User.Role.TECHNICIAN)
-            ),
+            "comment_form": CommentForm(),
         },
     )
 

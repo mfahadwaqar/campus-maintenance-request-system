@@ -1,0 +1,9 @@
+{% extends "ps4/base.html" %}
+{% block title %}{{ scenario.title }}{% endblock %}
+{% block content %}
+<h1>{{ scenario.title }}</h1>
+<p><strong>Trigger:</strong> {{ scenario.trigger }}</p>
+<h2>Main flow</h2><ol>{% for step in scenario.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+<p><strong>Expected result:</strong> {{ scenario.expected }}</p>
+<p><strong>Exception:</strong> {{ scenario.exception }}</p>
+{% endblock %}

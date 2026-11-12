@@ -6,7 +6,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from PIL import Image
 
-from accounts.models import Building, User
+from accounts.models import Building, Unit, UnitKind, User
 from assignments.models import Assignment
 from notifications.models import Notification
 from .models import Category, Comment, Photo, Report, StatusHistory, Verification
@@ -14,7 +14,6 @@ from .services import (
     add_comment,
     assign_technician,
     complete_work,
-    mark_duplicate,
     reopen_report,
     start_review,
     start_work,
@@ -29,11 +28,11 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.category = Category.objects.create(name="Plumbing")
         self.resident = self.make_user("resident", User.Role.RESIDENT)
         self.other_resident = self.make_user("other-resident", User.Role.RESIDENT)
-        self.officer = self.make_user("officer", User.Role.OFFICER)
-        self.second_officer = self.make_user("second-officer", User.Role.OFFICER)
-        self.technician = self.make_user("technician", User.Role.TECHNICIAN)
+        self.officer = self.make_user("officer", User.Role.CALL_CENTER_STAFF)
+        self.second_officer = self.make_user("second-officer", User.Role.CALL_CENTER_STAFF)
+        self.technician = self.make_user("technician", User.Role.TECHNICIAN_CONTRACTOR)
         self.other_technician = self.make_user(
-            "other-technician", User.Role.TECHNICIAN
+            "other-technician", User.Role.TECHNICIAN_CONTRACTOR
         )
 
     def tearDown(self):
@@ -41,11 +40,17 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             photo.file.delete(save=False)
 
     def make_user(self, username, role):
+        unit = None
+        if role == User.Role.TECHNICIAN_CONTRACTOR:
+            unit, _ = Unit.objects.get_or_create(
+                name="Workflow Unit", defaults={"kind": UnitKind.INTERNAL}
+            )
         return User.objects.create_user(
             username=username,
             password="test-password",
             email=f"{username}@example.test",
             role=role,
+            unit=unit,
         )
 
     def create_report(self, resident=None, **values):
@@ -177,7 +182,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.assertTrue(
             Notification.objects.filter(
                 report=report,
-                user__role=User.Role.OFFICER,
+                user__role=User.Role.CALL_CENTER_STAFF,
                 message__contains="was reopened",
             ).exists()
         )
@@ -271,7 +276,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.assertEqual(report.status, Report.Status.COMPLETED)
         self.assertFalse(Verification.objects.filter(report=report).exists())
 
-    def test_internal_comments_are_never_visible_to_residents(self):
+    def test_all_staff_comments_are_visible_to_residents(self):
         report = self.create_report()
         public_comment = add_comment(
             report_id=report.pk,
@@ -282,93 +287,17 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             report_id=report.pk,
             author=self.officer,
             body="Coordinate access with the building office.",
-            is_internal=True,
         )
         self.assertQuerySetEqual(
             Comment.objects.for_user(self.resident, report),
-            [public_comment],
+            [public_comment, internal_comment],
         )
 
         self.client.force_login(self.resident)
         response = self.client.get(reverse("reports:detail", args=(report.pk,)))
         self.assertContains(response, "Please knock before entering.")
-        self.assertNotContains(response, internal_comment.body)
+        self.assertContains(response, internal_comment.body)
         self.assertIn(internal_comment, Comment.objects.for_user(self.officer, report))
-
-    def test_merged_resident_sees_only_master_ticket_id_and_status(self):
-        master = self.create_report(
-            resident=self.other_resident,
-            title="MASTER PRIVATE TITLE",
-            room_location="MASTER ROOM 900",
-            description="MASTER PRIVATE REPAIR DESCRIPTION",
-        )
-        duplicate = self.create_report(
-            title="My duplicate request",
-            room_location="Room 205",
-        )
-        start_review(
-            report_id=duplicate.pk,
-            actor=self.officer,
-            expected_version=duplicate.version,
-        )
-        mark_duplicate(
-            report_id=duplicate.pk,
-            master_report_id=master.pk,
-            actor=self.officer,
-            expected_version=duplicate.version + 1,
-        )
-
-        self.client.force_login(self.resident)
-        response = self.client.get(reverse("reports:detail", args=(duplicate.pk,)))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f"Request #{master.pk}")
-        self.assertContains(response, master.get_status_display())
-        self.assertNotContains(response, "MASTER PRIVATE TITLE")
-        self.assertNotContains(response, "MASTER ROOM 900")
-        self.assertNotContains(response, "MASTER PRIVATE REPAIR DESCRIPTION")
-
-    def test_linked_resident_can_reopen_master_from_their_merged_ticket(self):
-        master = self.create_report(
-            resident=self.other_resident,
-            title="Master repair",
-        )
-        self.complete_report(master)
-        master.refresh_from_db()
-        duplicate = self.create_report(title="Linked resident report")
-        start_review(
-            report_id=duplicate.pk,
-            actor=self.officer,
-            expected_version=duplicate.version,
-        )
-        mark_duplicate(
-            report_id=duplicate.pk,
-            master_report_id=master.pk,
-            actor=self.officer,
-            expected_version=duplicate.version + 1,
-        )
-        duplicate.refresh_from_db()
-        self.client.force_login(self.resident)
-
-        detail_response = self.client.get(
-            reverse("reports:detail", args=(duplicate.pk,))
-        )
-        self.assertContains(detail_response, "Reopen master request")
-        response = self.client.post(
-            reverse("reports:reopen", args=(duplicate.pk,)),
-            {
-                "version": duplicate.version,
-                "reason": "The linked repair was not completed in my room.",
-            },
-        )
-
-        self.assertRedirects(response, reverse("reports:detail", args=(duplicate.pk,)))
-        master.refresh_from_db()
-        duplicate.refresh_from_db()
-        self.assertEqual(master.status, Report.Status.REOPENED)
-        self.assertEqual(duplicate.status, Report.Status.MERGED)
-        verification = Verification.objects.get(report=duplicate)
-        self.assertEqual(verification.outcome, Verification.Outcome.REOPENED)
-        self.assertIsNone(verification.rating)
 
     def test_status_changing_views_reject_get_requests(self):
         report = self.create_report()

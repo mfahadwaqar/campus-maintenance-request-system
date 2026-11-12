@@ -8,6 +8,18 @@ from .photo_pipeline import validate_and_reencode_photo
 class ReportSubmissionForm(forms.ModelForm):
     requested_urgency = forms.ChoiceField(choices=settings.REQUESTED_URGENCY_CHOICES)
     photo = forms.FileField(required=False)
+    room_location = forms.ChoiceField(label="Dorm room or Student Village")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from accounts.models import RoomLocation
+
+        choices = list(
+            RoomLocation.objects.filter(is_active=True)
+            .order_by("location_type", "name", "code")
+            .values_list("code", "code")
+        )
+        self.fields["room_location"].choices = choices
 
     class Meta:
         model = Report
@@ -56,23 +68,16 @@ class ReopenReportForm(forms.Form):
 class CommentForm(forms.Form):
     body = forms.CharField(max_length=2000, widget=forms.Textarea(attrs={"rows": 3}))
 
-    def __init__(self, *args, allow_internal=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.allow_internal = allow_internal
-        if allow_internal:
-            self.fields["is_internal"] = forms.BooleanField(
-                required=False, label="Internal (officers and technicians only)"
-            )
-
-    def clean_is_internal(self):
-        return self.cleaned_data.get("is_internal", False) if self.allow_internal else False
-
 
 class CompletionForm(forms.Form):
     completion_notes = forms.CharField(
         max_length=2000, widget=forms.Textarea(attrs={"rows": 4})
     )
     photo = forms.FileField(required=False)
+    requester_signed_on_site = forms.BooleanField(
+        required=False,
+        label="Resident signed on paper at the site",
+    )
     version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
 
     def __init__(self, *args, report, **kwargs):

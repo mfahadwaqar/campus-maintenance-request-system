@@ -28,4 +28,5 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("reports/", include("reports.urls")),
     path("", include("assignments.urls")),
+    path("ps4/", include("ps4.urls")),
 ]

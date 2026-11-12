@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import User
+from .models import Unit, UnitKind, User
 
 
 class RoleDashboardTests(TestCase):
@@ -9,15 +9,24 @@ class RoleDashboardTests(TestCase):
         self.password = "test-password-only"
 
     def create_user(self, username, role):
+        unit = None
+        if role == User.Role.TECHNICIAN_CONTRACTOR:
+            unit, _ = Unit.objects.get_or_create(
+                name="Test Unit", defaults={"kind": UnitKind.INTERNAL}
+            )
         return User.objects.create_user(
-            username=username, password=self.password, role=role
+            username=username,
+            password=self.password,
+            email=f"{username}@example.test",
+            role=role,
+            unit=unit,
         )
 
     def test_login_redirects_each_role_to_its_dashboard(self):
         dashboards = {
             User.Role.RESIDENT: "accounts:resident_dashboard",
-            User.Role.OFFICER: "accounts:officer_dashboard",
-            User.Role.TECHNICIAN: "accounts:technician_dashboard",
+            User.Role.CALL_CENTER_STAFF: "accounts:officer_dashboard",
+            User.Role.TECHNICIAN_CONTRACTOR: "accounts:technician_dashboard",
         }
         for role, dashboard_name in dashboards.items():
             with self.subTest(role=role):
@@ -79,6 +88,7 @@ class LoginRoleSelectionTests(TestCase):
         user = User.objects.create_user(
             username="resident",
             password="test-password-only",
+            email="resident@example.test",
             role=User.Role.RESIDENT,
         )
 
@@ -87,7 +97,7 @@ class LoginRoleSelectionTests(TestCase):
             {
                 "username": user.username,
                 "password": "test-password-only",
-                "role": User.Role.OFFICER,
+                "role": User.Role.CALL_CENTER_STAFF,
             },
         )
 

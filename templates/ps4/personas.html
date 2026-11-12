@@ -1,0 +1,11 @@
+{% extends "ps4/base.html" %}
+{% block title %}Personas{% endblock %}
+{% block content %}
+<h1>Personas</h1>
+{% for persona in personas %}
+<section>
+  <h2><a href="{% url 'ps4:persona_detail' slug=persona.slug %}">{{ persona.name }}</a></h2>
+  <p>{{ persona.role }}</p>
+</section>
+{% endfor %}
+{% endblock %}

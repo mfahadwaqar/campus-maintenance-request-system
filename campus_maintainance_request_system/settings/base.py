@@ -12,6 +12,8 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+REPAIR_CLOSE_DAYS = 15
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -23,6 +25,7 @@ INSTALLED_APPS = [
     "reports.apps.ReportsConfig",
     "assignments.apps.AssignmentsConfig",
     "notifications.apps.NotificationsConfig",
+    "ps4.apps.Ps4Config",
 ]
 
 MIDDLEWARE = [
@@ -121,4 +124,9 @@ PRIORITY_CHOICES = (
     ("LOW", "Low"),
     ("MEDIUM", "Medium"),
     ("HIGH", "High"),
+    ("URGENT", "Urgent"),
 )
+AUTO_CLOSE_COMPLETED_DAYS = int(os.environ.get("AUTO_CLOSE_COMPLETED_DAYS", "30"))
+REOPEN_AFTER_CLOSED_DAYS = int(os.environ.get("REOPEN_AFTER_CLOSED_DAYS", "60"))
+TICKET_PREFIX = os.environ.get("TICKET_PREFIX", "MR")
+SYSTEM_USER_EMAIL = os.environ.get("SYSTEM_USER_EMAIL", "system@campus.local")

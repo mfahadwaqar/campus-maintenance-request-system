@@ -5,14 +5,14 @@
             <p>
                 <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
                 · {{ comment.created_at|date:"M j, Y, P" }}
-                {% if comment.is_internal %}<span class="status">Internal</span>{% endif %}
+                {% if comment.kind == "FOLLOW_UP" %}<span class="status">Follow-up</span>{% endif %}
             </p>
             <p class="user-content">{{ comment.body|linebreaksbr }}</p>
         </article>
     {% empty %}
         <p>No comments yet.</p>
     {% endfor %}
-    {% if comment_form %}
+    {% if comment_form and report.status != "CLOSED" %}
         <form method="post" action="{% url 'reports:comments' report.id %}">
             {% csrf_token %}
             {% for field in comment_form %}
@@ -24,5 +24,7 @@
             {% endfor %}
             <button type="submit">Add comment</button>
         </form>
+    {% elif report.status == "CLOSED" %}
+        <p>This ticket is closed and comments are no longer accepted.</p>
     {% endif %}
 </section>

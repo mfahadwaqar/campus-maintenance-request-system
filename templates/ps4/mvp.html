@@ -1,0 +1,9 @@
+{% extends "ps4/base.html" %}
+{% block title %}MVP decisions{% endblock %}
+{% block content %}
+<h1>MVP feature decisions</h1>
+<table><thead><tr><th>Feature</th><th>Decision</th><th>Scope</th><th>Reason</th></tr></thead>
+<tbody>{% for item in decisions %}
+<tr><td>{{ item.feature }}</td><td>{{ item.decision }}</td><td>{{ item.scope }}</td><td>{{ item.reason }}</td></tr>
+{% endfor %}</tbody></table>
+{% endblock %}

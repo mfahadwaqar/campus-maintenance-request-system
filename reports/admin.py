@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Photo, Report, StatusHistory
+from .models import Category, Photo, StatusHistory
 
 
 @admin.register(Category)
@@ -8,48 +8,17 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-@admin.register(Report)
-class ReportAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "resident", "status", "created_at")
-    list_filter = ("status", "category", "building")
-    search_fields = ("title", "resident__username")
-    readonly_fields = (
-        "resident",
-        "category",
-        "building",
-        "room_location",
-        "title",
-        "description",
-        "requested_urgency",
-        "priority",
-        "status",
-        "merged_into",
-        "version",
-        "created_at",
-        "updated_at",
-    )
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
 @admin.register(Photo)
 class PhotoAdmin(admin.ModelAdmin):
-    list_display = ("id", "report", "uploaded_by", "stage", "uploaded_at")
+    list_display = ("id", "report", "uploaded_by", "stage", "file_path")
     readonly_fields = (
         "report",
         "uploaded_by",
         "stage",
-        "private_filename",
-        "uploaded_at",
+        "file_path",
+        "content_type",
+        "size_bytes",
     )
-
-    @admin.display(description="Stored file")
-    def private_filename(self, obj):
-        return obj.file.name
 
     def has_add_permission(self, request):
         return False

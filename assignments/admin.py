@@ -1,13 +1,6 @@
 from django.contrib import admin
 
-from .models import Assignment, TechnicianSpecialization
-
-
-@admin.register(TechnicianSpecialization)
-class TechnicianSpecializationAdmin(admin.ModelAdmin):
-    list_display = ("technician", "category")
-    list_filter = ("category",)
-    search_fields = ("technician__username", "category__name")
+from .models import Assignment
 
 
 @admin.register(Assignment)

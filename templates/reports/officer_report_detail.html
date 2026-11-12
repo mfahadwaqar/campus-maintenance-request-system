@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Officer review · Request #{{ report.id }}{% endblock %}
+{% block title %}Call Center Staff review · Request #{{ report.id }}{% endblock %}
 
 {% block content %}
 <article class="panel">
-    <p class="eyebrow">Officer · Request #{{ report.id }}</p>
+    <p class="eyebrow">Call Center Staff · Request #{{ report.id }}</p>
     <div class="page-heading">
         <h1>{{ report.title }}</h1>
         <span class="status">{{ report.get_status_display }}</span>

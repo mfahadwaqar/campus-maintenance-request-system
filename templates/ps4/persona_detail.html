@@ -1,0 +1,14 @@
+{% extends "ps4/base.html" %}
+{% block title %}{{ persona.name }}{% endblock %}
+{% block content %}
+<h1>{{ persona.name }}</h1>
+<dl>
+  <dt>Role</dt><dd>{{ persona.role }}</dd>
+  <dt>Background</dt><dd>{{ persona.background }}</dd>
+  <dt>Goals</dt><dd>{{ persona.goals }}</dd>
+  <dt>Frustrations</dt><dd>{{ persona.frustrations }}</dd>
+  <dt>Constraints</dt><dd>{{ persona.constraints }}</dd>
+  <dt>Evidence</dt><dd>{{ persona.evidence_codes|join:", " }}</dd>
+</dl>
+<p class="pending">{{ persona.pending }}</p>
+{% endblock %}

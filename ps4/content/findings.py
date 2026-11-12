@@ -1,0 +1,27 @@
+FINDINGS = {
+    "stakeholder_interview": {
+        "date": "28 October 2026",
+        "mode": "in person at the Accommodation Office",
+        "participants": ["OFAM-1", "OFAM-2"],
+        "duration": "[PENDING: duration of the 28 October meeting]",
+        "source_note": "Stakeholder interview. Findings are paraphrased, not quoted.",
+    },
+    "findings": [
+        {"code": "OFAM-1/01", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Requests arrive by telephone, email, online, and at the counter; staff enter those received by phone or in person.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/02", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Residents do not hold FIMS accounts.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/03", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Staff check the occupant and room before a ticket is issued, because the technician borrows a master key.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/04", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Work is dispatched to units, which may be contractors, by category. Automatic routing is unconfirmed.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/05", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Requests waiting for parts or stock have no status visible to the resident.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/06", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Contractors work on the web and by mobile phone, and sometimes collect a resident's signature on a paper form.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/07", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "A ticket closes 15 days after completion unless the resident rates or reopens it earlier.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/08", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Students rarely quote ticket numbers and often email the director instead of the call center.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/09", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Students mostly ignore closure surveys and may not read system replies.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/10", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "Contractors can see their own performance results.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-1/11", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "A later follow-up is linked to an existing ticket; tickets are not merged.", "evidence_type": "observed", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+        {"code": "OFAM-INT-1", "user_class": "OFAM staff", "date": "28 October 2026", "mode": "in person at the Accommodation Office", "finding": "A stronger student-facing status view and follow-up route may address the communication problem.", "evidence_type": "interpretation", "source_note": "Stakeholder interview. Findings are paraphrased, not quoted."},
+    ],
+    "student_interviews": "[PENDING: student interview records (code, date, mode, duration, user class)]",
+    "call_center_interviews": "[PENDING: call center staff interview records]",
+    "disagreements": "[PENDING: disagreements between participants]",
+    "open_questions": ["automatic routing", "closure actor", "contractor performance rules", "FIMS documentation"],
+}

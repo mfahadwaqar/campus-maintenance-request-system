@@ -1,10 +1,12 @@
 from functools import wraps
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, redirect_to_login
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -20,9 +22,9 @@ from assignments.forms import (
 from assignments.models import Assignment
 from reports.forms import CommentForm
 from reports.models import Comment, Report
+from accounts.models import Unit
 from reports.services import (
     ReportConflict,
-    mark_duplicate,
     reject_report,
     set_priority,
     start_review,
@@ -34,14 +36,19 @@ class RoleLoginView(LoginView):
     template_name = "accounts/login.html"
 
     def get_success_url(self):
+        next_url = self.get_redirect_url()
+        if next_url and next_url != "/":
+            return next_url
         return dashboard_url_for_role(self.request.user.role)
 
 
 def dashboard_url_for_role(role):
+    if role is None:
+        return "/admin/"
     dashboards = {
         User.Role.RESIDENT: "accounts:resident_dashboard",
-        User.Role.OFFICER: "accounts:officer_dashboard",
-        User.Role.TECHNICIAN: "accounts:technician_dashboard",
+        User.Role.CALL_CENTER_STAFF: "accounts:officer_dashboard",
+        User.Role.TECHNICIAN_CONTRACTOR: "accounts:technician_dashboard",
     }
     destination = dashboards.get(role)
     if destination is None:
@@ -77,7 +84,7 @@ def resident_dashboard(request):
     return render(request, "accounts/resident_dashboard.html")
 
 
-@role_required(User.Role.OFFICER)
+@role_required(User.Role.CALL_CENTER_STAFF)
 def officer_dashboard(request):
     filter_form = OfficerQueueFilterForm(request.GET or None)
     reports = Report.objects.for_user(request.user).select_related(
@@ -100,6 +107,11 @@ def officer_dashboard(request):
             reports = reports.filter(category=filters["category"])
         if filters["building"]:
             reports = reports.filter(building=filters["building"])
+        if filters["follow_up"]:
+            reports = reports.filter(
+                comments__author__role=User.Role.RESIDENT,
+                awaiting_call_center_response=True,
+            ).distinct()
 
     page = Paginator(reports, 25).get_page(request.GET.get("page"))
     query_params = request.GET.copy()
@@ -116,16 +128,52 @@ def officer_dashboard(request):
     )
 
 
+@login_required
+def unit_kpis(request):
+    if request.user.role == User.Role.TECHNICIAN_CONTRACTOR:
+        units = Unit.objects.filter(pk=request.user.unit_id, is_active=True)
+    elif request.user.role == User.Role.CALL_CENTER_STAFF or request.user.is_staff:
+        units = Unit.objects.filter(is_active=True)
+    else:
+        raise Http404
+
+    unit_rows = []
+    for unit in units.order_by("name"):
+        assignments = Assignment.objects.filter(
+            unit=unit,
+            completed_at__isnull=False,
+            started_at__isnull=False,
+        )
+        durations = [
+            assignment.completed_at - assignment.started_at
+            for assignment in assignments.only("started_at", "completed_at")
+        ]
+        average_seconds = (
+            sum(duration.total_seconds() for duration in durations) / len(durations)
+            if durations
+            else 0
+        )
+        unit_rows.append(
+            {
+                "unit": unit,
+                "completed_jobs": len(durations),
+                "average_hours": round(average_seconds / 3600, 2),
+            }
+        )
+
+    return render(request, "accounts/unit_kpis.html", {"unit_rows": unit_rows})
+
+
 def _officer_report_or_404(request, report_id):
     return get_object_or_404(Report.objects.for_user(request.user), pk=report_id)
 
 
-@role_required(User.Role.OFFICER)
+@role_required(User.Role.CALL_CENTER_STAFF)
 def officer_report_detail(request, report_id):
     report = _officer_report_or_404(request, report_id)
     report = (
         Report.objects.filter(pk=report.pk)
-        .select_related("resident", "category", "building", "merged_into")
+        .select_related("resident", "category", "building")
         .prefetch_related(
             "photos",
             "status_history__changed_by",
@@ -142,7 +190,7 @@ def officer_report_detail(request, report_id):
     context["comments"] = Comment.objects.for_user(
         request.user, report
     ).select_related("author")
-    context["comment_form"] = CommentForm(allow_internal=True)
+    context["comment_form"] = CommentForm()
     if report.status == Report.Status.SUBMITTED:
         context["review_form"] = ReviewReportForm(report=report)
     elif report.status == Report.Status.UNDER_REVIEW:
@@ -160,7 +208,7 @@ def officer_report_detail(request, report_id):
     return render(request, "reports/officer_report_detail.html", context)
 
 
-@role_required(User.Role.OFFICER)
+@role_required(User.Role.CALL_CENTER_STAFF)
 @require_POST
 def begin_report_review(request, report_id):
     report = _officer_report_or_404(request, report_id)
@@ -183,7 +231,7 @@ def begin_report_review(request, report_id):
     return redirect("accounts:officer_dashboard")
 
 
-@role_required(User.Role.OFFICER)
+@role_required(User.Role.CALL_CENTER_STAFF)
 @require_POST
 def update_report_priority(request, report_id):
     report = _officer_report_or_404(request, report_id)
@@ -206,7 +254,7 @@ def update_report_priority(request, report_id):
     return redirect("accounts:officer_report_detail", report_id=report_id)
 
 
-@role_required(User.Role.OFFICER)
+@role_required(User.Role.CALL_CENTER_STAFF)
 @require_POST
 def reject_report_view(request, report_id):
     report = _officer_report_or_404(request, report_id)
@@ -229,30 +277,7 @@ def reject_report_view(request, report_id):
     return redirect("accounts:officer_report_detail", report_id=report_id)
 
 
-@role_required(User.Role.OFFICER)
-@require_POST
-def mark_duplicate_view(request, report_id):
-    report = _officer_report_or_404(request, report_id)
-    form = DuplicateReportForm(request.POST, report=report)
-    if not form.is_valid():
-        messages.error(request, "Choose a valid master report.")
-        return redirect("accounts:officer_report_detail", report_id=report_id)
-    try:
-        mark_duplicate(
-            report_id=report.pk,
-            master_report_id=form.cleaned_data["master_report"].pk,
-            actor=request.user,
-            expected_version=form.cleaned_data["version"],
-        )
-        messages.success(request, "Request marked as a duplicate.")
-    except (ValidationError, ReportConflict) as exc:
-        messages.error(
-            request, "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
-        )
-    return redirect("accounts:officer_report_detail", report_id=report_id)
-
-
-@role_required(User.Role.TECHNICIAN)
+@role_required(User.Role.TECHNICIAN_CONTRACTOR)
 def technician_dashboard(request):
     reports = (
         Report.objects.for_user(request.user)

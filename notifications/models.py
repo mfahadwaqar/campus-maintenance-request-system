@@ -7,11 +7,12 @@ class Notification(models.Model):
         EMAIL = "EMAIL", "Email"
         IN_APP = "IN_APP", "In app"
 
-    class Status(models.TextChoices):
+    class DeliveryStatus(models.TextChoices):
         PENDING = "PENDING", "Pending"
         SENT = "SENT", "Sent"
         FAILED = "FAILED", "Failed"
-        READ = "READ", "Read"
+
+    Status = DeliveryStatus
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -21,12 +22,12 @@ class Notification(models.Model):
     report = models.ForeignKey(
         "reports.Report", on_delete=models.PROTECT, related_name="notifications"
     )
-    message = models.CharField(max_length=250)
-    channel = models.CharField(max_length=16, choices=Channel.choices)
-    status = models.CharField(
-        max_length=16, choices=Status.choices, default=Status.PENDING
-    )
+    message = models.CharField(max_length=500)
+    channel = models.CharField(max_length=10, choices=Channel.choices, default=Channel.EMAIL)
+    status = models.CharField(max_length=16, choices=DeliveryStatus.choices, default=DeliveryStatus.PENDING)
+    delivery_status = models.CharField(max_length=16, choices=DeliveryStatus.choices, default=DeliveryStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

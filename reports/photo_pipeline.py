@@ -24,7 +24,7 @@ def validate_and_reencode_photo(uploaded_file):
         raise ValidationError("Only JPEG and PNG photos are allowed.")
 
     expected_format, expected_mime, output_format = expected
-    if uploaded_file.content_type != expected_mime:
+    if getattr(uploaded_file, "content_type", expected_mime) != expected_mime:
         raise ValidationError("The photo extension and MIME type do not match.")
     if uploaded_file.size > settings.MAX_PHOTO_SIZE:
         raise ValidationError("The photo exceeds the maximum allowed size.")

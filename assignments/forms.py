@@ -1,10 +1,9 @@
 from django import forms
 from django.conf import settings
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Count, Q
 
 from accounts.models import Building, User
 from reports.models import Category, Report
-from .models import TechnicianSpecialization
 
 
 class TechnicianChoiceField(forms.ModelChoiceField):
@@ -21,22 +20,22 @@ class AssignTechnicianForm(forms.Form):
 
     def __init__(self, *args, report, **kwargs):
         super().__init__(*args, **kwargs)
-        matching_specialization = TechnicianSpecialization.objects.filter(
-            technician_id=OuterRef("pk"), category=report.category
-        )
+        suggested_unit = report.subcategory.default_unit if report.subcategory and report.subcategory.default_unit_id else report.category.default_unit
+        technician_queryset = User.objects.filter(role=User.Role.TECHNICIAN_CONTRACTOR, is_active=True)
+        if suggested_unit is not None:
+            technician_queryset = technician_queryset.filter(unit=suggested_unit)
         self.fields["technician"].queryset = (
-            User.objects.filter(role=User.Role.TECHNICIAN, is_active=True)
+            technician_queryset
             .annotate(
-                matches_category=Exists(matching_specialization),
                 active_job_count=Count(
                     "assignments_received",
                     filter=Q(assignments_received__is_active=True),
                     distinct=True,
                 ),
             )
-            .order_by("-matches_category", "active_job_count", "username")
+            .order_by("active_job_count", "username")
         )
-        self.fields["technician"].label = "Technician"
+        self.fields["technician"].label = "Technician/Contractor"
         self.fields["priority"].required = (
             report.status == "UNDER_REVIEW"
         )
@@ -50,28 +49,6 @@ class ReviewReportForm(forms.Form):
     def __init__(self, *args, report, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["version"].initial = report.version
-
-
-class OfficerQueueFilterForm(forms.Form):
-    status = forms.ChoiceField(
-        choices=(("", "All statuses"), *Report.Status.choices), required=False
-    )
-    category = forms.ModelChoiceField(
-        queryset=Category.objects.none(), required=False, empty_label="All categories"
-    )
-    building = forms.ModelChoiceField(
-        queryset=Building.objects.none(), required=False, empty_label="All buildings"
-    )
-    priority = forms.ChoiceField(
-        choices=(("", "All priorities"), *settings.PRIORITY_CHOICES),
-        required=False,
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["category"].queryset = Category.objects.order_by("name")
-        self.fields["building"].queryset = Building.objects.order_by("zone", "name")
-
 
 class RejectReportForm(forms.Form):
     reason = forms.CharField(max_length=500, widget=forms.Textarea(attrs={"rows": 3}))
@@ -90,7 +67,7 @@ class DuplicateReportForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["master_report"].queryset = (
             Report.objects.exclude(pk=report.pk)
-            .exclude(status__in=(Report.Status.MERGED, Report.Status.REJECTED))
+            .exclude(status=Report.Status.REJECTED)
             .order_by("-created_at")
         )
         self.fields["version"].initial = report.version
@@ -103,3 +80,30 @@ class SetPriorityForm(forms.Form):
     def __init__(self, *args, report, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["version"].initial = report.version
+
+
+class OfficerQueueFilterForm(forms.Form):
+    status = forms.ChoiceField(
+        choices=(("", "All statuses"), *Report.Status.choices),
+        required=False,
+    )
+    priority = forms.ChoiceField(
+        choices=(("", "All priorities"), *settings.PRIORITY_CHOICES),
+        required=False,
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.none(),
+        required=False,
+        empty_label="All categories",
+    )
+    building = forms.ModelChoiceField(
+        queryset=Building.objects.none(),
+        required=False,
+        empty_label="All buildings",
+    )
+    follow_up = forms.BooleanField(required=False, label="Resident follow-ups")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = Category.objects.order_by("name")
+        self.fields["building"].queryset = Building.objects.order_by("zone", "name")

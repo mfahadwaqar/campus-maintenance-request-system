@@ -4,10 +4,10 @@
 
 {% block content %}
 <section class="panel form-panel">
-    <p class="eyebrow">Officer · Request #{{ report.id }}</p>
-    <h1>Assign a technician</h1>
+    <p class="eyebrow">Call Center Staff · Request #{{ report.id }}</p>
+    <h1>Assign a Technician/Contractor</h1>
     <p>{{ report.title }} · {{ report.category }} · {{ report.building }}</p>
-    <p>Choose the technician and priority for this request, then confirm the assignment.</p>
+    <p>Choose the Technician/Contractor and priority for this request, then confirm the assignment.</p>
     {% if conflict_message %}
         <p class="error-message" role="alert">{{ conflict_message }}</p>
     {% endif %}

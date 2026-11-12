@@ -1,0 +1,13 @@
+{% extends "ps4/base.html" %}
+{% block title %}Alternatives{% endblock %}
+{% block content %}
+<h1>Alternatives and existing solutions</h1>
+<h2>Offline solution</h2><p class="pending">{{ alternatives.offline }}</p>
+<h2>Commercial and public comparators</h2>
+<table><thead><tr><th>Name</th><th>Features</th><th>Registration</th><th>Usability</th><th>Limitations</th></tr></thead>
+<tbody>{% for item in alternatives.comparators %}
+<tr><td>{{ item.name }}<br>{{ item.url }}</td><td>{{ item.features }}</td><td>{{ item.registration }}</td><td>{{ item.usability }}</td><td>{{ item.limitations }}</td></tr>
+{% endfor %}</tbody></table>
+<p><strong>Local comparator:</strong> {{ alternatives.local_comparator }}</p>
+<p class="pending">{{ alternatives.application_adds }}</p>
+{% endblock %}

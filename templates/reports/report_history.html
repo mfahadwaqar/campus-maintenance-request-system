@@ -17,9 +17,11 @@
             <li>No status updates yet.</li>
         {% endfor %}
     </ol>
-    {% if user.role == "OFFICER" %}
+    <h2>Comments</h2>
+    {% include "reports/_comments.html" %}
+    {% if user.role == "CALL_CENTER_STAFF" %}
         <a href="{% url 'accounts:officer_report_detail' report.id %}">Back to officer review</a>
-    {% elif user.role == "TECHNICIAN" %}
+    {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
         <a href="{% url 'assignments:technician_report_detail' report.id %}">Back to work order</a>
     {% else %}
         <a href="{% url 'reports:detail' report.id %}">Back to request</a>

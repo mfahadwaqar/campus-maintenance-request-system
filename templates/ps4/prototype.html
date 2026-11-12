@@ -1,0 +1,11 @@
+{% extends "ps4/base.html" %}
+{% block title %}Prototype{% endblock %}
+{% block content %}
+<h1>Prototype and feedback</h1>
+{% for screen in prototype.screens %}
+<section><h2>{{ screen.figure }}: {{ screen.label }}</h2><p>{{ screen.note }}</p></section>
+{% endfor %}
+<p class="pending">{{ prototype.feedback }}</p>
+<p class="pending">{{ prototype.suggestions }}</p>
+<p class="pending">{{ prototype.walkthrough_screen }}</p>
+{% endblock %}
