@@ -8,31 +8,49 @@
     <link rel="stylesheet" href="{% static 'accounts/style.css' %}">
 </head>
 <body>
-    <header class="site-header">
-        <a class="brand" href="{% url 'accounts:dashboard' %}">Campus Maintenance</a>
-        <nav aria-label="Main navigation">
-            {% if user.is_authenticated %}
+{% with current=request.resolver_match.view_name %}
+{% if user.is_authenticated %}
+    <div class="shell">
+        <aside class="sidebar">
+            <a class="brand" href="{% url 'accounts:dashboard' %}">
+                <span class="brand-mark" aria-hidden="true">CM</span>
+                <span>Campus Maintenance</span>
+            </a>
+            <nav class="nav" aria-label="Main navigation">
                 {% if user.role == "RESIDENT" %}
-                    <a href="{% url 'accounts:resident_dashboard' %}">Dashboard</a>
-                    <a href="{% url 'reports:list' %}">Requests</a>
+                    <a href="{% url 'accounts:resident_dashboard' %}"{% if current == 'accounts:resident_dashboard' %} aria-current="page"{% endif %}>Dashboard</a>
+                    <a href="{% url 'reports:list' %}"{% if current == 'reports:list' or current == 'reports:detail' %} aria-current="page"{% endif %}>My requests</a>
+                    <a href="{% url 'reports:create' %}"{% if current == 'reports:create' %} aria-current="page"{% endif %}>New request</a>
                 {% elif user.role == "CALL_CENTER_STAFF" %}
-                    <a href="{% url 'accounts:officer_dashboard' %}">Dashboard</a>
+                    <a href="{% url 'accounts:officer_dashboard' %}"{% if current == 'accounts:officer_dashboard' or current == 'accounts:officer_report_detail' %} aria-current="page"{% endif %}>Queue</a>
+                    <a href="{% url 'accounts:unit_kpis' %}"{% if current == 'accounts:unit_kpis' %} aria-current="page"{% endif %}>Unit results</a>
                 {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
-                    <a href="{% url 'accounts:technician_dashboard' %}">Dashboard</a>
+                    <a href="{% url 'accounts:technician_dashboard' %}"{% if current == 'accounts:technician_dashboard' or current == 'assignments:technician_report_detail' %} aria-current="page"{% endif %}>My work</a>
+                    <a href="{% url 'accounts:unit_kpis' %}"{% if current == 'accounts:unit_kpis' %} aria-current="page"{% endif %}>Unit results</a>
                 {% endif %}
                 {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
-                <span class="user-label">{{ user.get_full_name|default:user.username }}</span>
+            </nav>
+            <div class="sidebar-foot">
+                <div>
+                    <div class="user-label">{{ user.get_full_name|default:user.username }}</div>
+                    <div class="role-label">{{ user.get_role_display|default:"" }}</div>
+                </div>
                 <form class="inline-form" action="{% url 'accounts:logout' %}" method="post">
                     {% csrf_token %}
                     <button class="nav-button" type="submit">Log out</button>
                 </form>
-            {% else %}
-                <a href="{% url 'accounts:login' %}">Log in</a>
-            {% endif %}
-        </nav>
-    </header>
-    <main class="page-content">
-        {% block content %}{% endblock %}
-    </main>
+            </div>
+        </aside>
+{% else %}
+    <div class="auth-shell">
+{% endif %}
+        <main class="page-content">
+            {% for message in messages %}
+                <p class="alert alert-{{ message.level_tag|default:'info' }}" role="status">{{ message }}</p>
+            {% endfor %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+{% endwith %}
 </body>
 </html>

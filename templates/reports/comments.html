@@ -7,6 +7,6 @@
     <p class="eyebrow">Request #{{ report.id }}</p>
     <h1>Comments</h1>
     {% include "reports/_comments.html" %}
-    <a href="{% url 'reports:detail' report.id %}">Back to request</a>
+    <p><a href="{% url 'reports:detail' report.id %}">Back to request</a></p>
 </section>
 {% endblock %}

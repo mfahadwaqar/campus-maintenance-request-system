@@ -2,15 +2,15 @@
     <h2>Comments</h2>
     {% for comment in comments %}
         <article class="comment">
-            <p>
+            <p class="meta">
                 <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
                 · {{ comment.created_at|date:"M j, Y, P" }}
-                {% if comment.kind == "FOLLOW_UP" %}<span class="status">Follow-up</span>{% endif %}
+                {% if comment.kind == "FOLLOW_UP" %}<span class="status status-reopened">Follow-up</span>{% endif %}
             </p>
             <p class="user-content">{{ comment.body|linebreaksbr }}</p>
         </article>
     {% empty %}
-        <p>No comments yet.</p>
+        <p class="muted">No comments yet.</p>
     {% endfor %}
     {% if comment_form and report.status != "CLOSED" %}
         <form method="post" action="{% url 'reports:comments' report.id %}">
@@ -25,6 +25,6 @@
             <button type="submit">Add comment</button>
         </form>
     {% elif report.status == "CLOSED" %}
-        <p>This ticket is closed and comments are no longer accepted.</p>
+        <p class="muted">This ticket is closed and comments are no longer accepted.</p>
     {% endif %}
 </section>

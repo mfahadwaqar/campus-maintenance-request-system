@@ -1,17 +1,20 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Call Center Staff review · Request #{{ report.id }}{% endblock %}
 
 {% block content %}
-<article class="panel">
+<div class="stack">
+<article class="card">
     <p class="eyebrow">Call Center Staff · Request #{{ report.id }}</p>
     <div class="page-heading">
-        <h1>{{ report.title }}</h1>
-        <span class="status">{{ report.get_status_display }}</span>
+        <div>
+            <h1>{{ report.title }}</h1>
+            <span class="ticket-tag">{{ report.ticket_no }}</span>
+        </div>
+        <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
     </div>
-    {% for message in messages %}
-        <p class="status-message">{{ message }}</p>
-    {% endfor %}
+    {% journey report.status %}
 
     <dl class="report-details">
         <dt>Resident</dt><dd>{{ report.resident.get_full_name|default:report.resident.username }} · {{ report.resident.email }} · {{ report.resident.phone }}</dd>
@@ -25,52 +28,55 @@
             <dt>Master report</dt><dd>Request #{{ report.merged_into_id }}</dd>
         {% endif %}
     </dl>
+</article>
+
+<section class="card">
     <h2>Description</h2>
     <p class="user-content">{{ report.description|linebreaksbr }}</p>
+</section>
 
-    {% if report.status == "SUBMITTED" %}
+{% if report.status == "SUBMITTED" %}
+    <section class="card">
         <form method="post" action="{% url 'accounts:begin_report_review' report.id %}">
             {% csrf_token %}
             {{ review_form.version }}
             <button type="submit">Begin review</button>
         </form>
-    {% elif report.status == "UNDER_REVIEW" %}
-        <section>
+    </section>
+{% elif report.status == "UNDER_REVIEW" %}
+    <div class="grid-2">
+        <section class="card">
             <h2>Set priority</h2>
             <form method="post" action="{% url 'accounts:update_report_priority' report.id %}">
                 {% csrf_token %}
                 {{ priority_form.version }}
-                {{ priority_form.priority.label_tag }}
-                {{ priority_form.priority }}
+                <div class="form-field">
+                    {{ priority_form.priority.label_tag }}
+                    {{ priority_form.priority }}
+                </div>
                 <button type="submit">Save priority</button>
             </form>
         </section>
-        <section>
+        <section class="card">
             <h2>Assign technician</h2>
             <p>Select a technician and set the priority together on the assignment form.</p>
             <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose technician</a>
         </section>
-        <section>
+        <section class="card">
             <h2>Reject request</h2>
             <form method="post" action="{% url 'accounts:reject_report' report.id %}">
                 {% csrf_token %}
                 {{ reject_form.version }}
-                {{ reject_form.reason.label_tag }}
-                {{ reject_form.reason }}
-                <button type="submit">Reject request</button>
+                <div class="form-field">
+                    {{ reject_form.reason.label_tag }}
+                    {{ reject_form.reason }}
+                </div>
+                <button type="submit" class="button-danger">Reject request</button>
             </form>
         </section>
-        <section>
-            <h2>Mark as duplicate</h2>
-            <form method="post" action="{% url 'accounts:mark_duplicate' report.id %}">
-                {% csrf_token %}
-                {{ duplicate_form.version }}
-                {{ duplicate_form.master_report.label_tag }}
-                {{ duplicate_form.master_report }}
-                <button type="submit">Merge as duplicate</button>
-            </form>
-        </section>
-    {% elif report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}
+    </div>
+{% elif report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}
+    <section class="card">
         <h2>Assignment history</h2>
         <ul>
             {% for assignment in report.assignments.all %}
@@ -84,10 +90,16 @@
             {% endfor %}
         </ul>
         <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Reassign technician</a>
-    {% endif %}
+    </section>
+{% endif %}
 
-    <p><a href="{% url 'reports:history' report.id %}">View full status history</a></p>
+<section class="card">
     {% include "reports/_comments.html" %}
-    <p><a href="{% url 'accounts:officer_dashboard' %}">Back to queue</a></p>
-</article>
+</section>
+
+<p>
+    <a href="{% url 'reports:history' report.id %}">View full status history</a> ·
+    <a href="{% url 'accounts:officer_dashboard' %}">Back to queue</a>
+</p>
+</div>
 {% endblock %}

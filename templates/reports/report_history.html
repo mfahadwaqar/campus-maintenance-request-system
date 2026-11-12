@@ -19,6 +19,7 @@
     </ol>
     <h2>Comments</h2>
     {% include "reports/_comments.html" %}
+    <p>
     {% if user.role == "CALL_CENTER_STAFF" %}
         <a href="{% url 'accounts:officer_report_detail' report.id %}">Back to officer review</a>
     {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
@@ -26,5 +27,6 @@
     {% else %}
         <a href="{% url 'reports:detail' report.id %}">Back to request</a>
     {% endif %}
+    </p>
 </section>
 {% endblock %}
