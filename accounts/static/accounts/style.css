@@ -263,3 +263,6 @@ tbody tr:last-child td { border-bottom: 0; }
 .pending { background: #fff4e0; }
 
 textarea { height: 7rem; }
+
+/* PS4 prototype screenshots */
+.proto-shot { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }

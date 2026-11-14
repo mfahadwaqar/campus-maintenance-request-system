@@ -1,11 +1,65 @@
 {% extends "ps4/base.html" %}
+{% load static %}
 {% block title %}Prototype{% endblock %}
 {% block content %}
 <h1>Prototype and feedback</h1>
+<p>{{ prototype.intro }}</p>
+
+<h2>Screens</h2>
 {% for screen in prototype.screens %}
-<section><h2>{{ screen.figure }}: {{ screen.label }}</h2><p>{{ screen.note }}</p></section>
+<section>
+  <h3>{{ screen.figure }}: {{ screen.label }}</h3>
+  <p>{{ screen.note }}</p>
+  <img class="proto-shot" src="{% static screen.image %}" alt="{{ screen.figure }}: {{ screen.label }}" loading="lazy">
+</section>
 {% endfor %}
-<p class="pending">{{ prototype.feedback }}</p>
-<p class="pending">{{ prototype.suggestions }}</p>
-<p class="pending">{{ prototype.walkthrough_screen }}</p>
+
+<h2>Concept review session</h2>
+<dl class="report-details">
+  <dt>Date</dt><dd>{{ prototype.session.date }}</dd>
+  <dt>Mode</dt><dd>{{ prototype.session.mode }}</dd>
+  <dt>Duration</dt><dd>{{ prototype.session.duration }}</dd>
+  <dt>Concept shown</dt><dd>{{ prototype.session.concept_shown }}</dd>
+  <dt>Task prompt</dt><dd>{{ prototype.session.task_prompt }}</dd>
+  <dt>Participants</dt>
+  <dd>{% for p in prototype.participants %}{{ p.code }} ({{ p.user_class }}){% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+</dl>
+
+<h2>Which steps were understandable, confusing, missing or unnecessary</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Step</th><th>Rating</th><th>Who</th><th>Observation</th><th>What it means for the design</th></tr></thead>
+  <tbody>
+  {% for s in prototype.steps %}
+    <tr><td>{{ s.step }}</td><td>{{ s.rating }}</td><td>{{ s.who }}</td><td>{{ s.observation }}</td><td>{{ s.implication }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>Feedback by participant</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Code</th><th>Type</th><th>Feedback</th></tr></thead>
+  <tbody>
+  {% for f in prototype.feedback %}
+    <tr><td>{{ f.code }}</td><td>{{ f.type }}</td><td>{{ f.text }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>Suggestions and what they imply</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Code</th><th>Suggestion or concern</th><th>Design implication</th></tr></thead>
+  <tbody>
+  {% for s in prototype.suggestions %}
+    <tr><td>{{ s.code }}</td><td>{{ s.suggestion }}</td><td>{{ s.implication }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<p class="pending">{{ prototype.limitations }}</p>
 {% endblock %}
