@@ -1,4 +1,5 @@
 {% extends "ps4/base.html" %}
+{% load static %}
 {% block title %}Alternatives{% endblock %}
 {% block content %}
 <h1>Alternatives and existing solutions</h1>
@@ -21,17 +22,52 @@
     <tr>
       <td>{{ item.name }}</td>
       <td>{{ item.features }}</td>
-      <td><span class="pending">{{ item.registration }}</span></td>
-      <td><span class="pending">{{ item.usability }}</span></td>
+      <td>{{ item.registration }}</td>
+      <td>{{ item.usability }}</td>
       <td>{{ item.limitations }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
-<p class="pending"><strong>Access dates:</strong> {{ alternatives.access_dates }}</p>
+<h2>Comparator check</h2>
+<p>{{ alternatives.review_summary }}</p>
+<h3>What was actually done, and what was not</h3>
+<ul>{% for item in alternatives.what_was_done %}<li>{{ item }}</li>{% endfor %}</ul>
+<h3>Access record</h3>
+<table>
+  <thead><tr><th>System</th><th>Address</th><th>Accessed</th><th>What was reached</th></tr></thead>
+  <tbody>
+    {% for item in alternatives.access_records %}
+    <tr>
+      <td>{{ item.system }}</td>
+      <td>{{ item.address }}</td>
+      <td>{{ item.accessed }}</td>
+      <td>{{ item.reached }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<h3>Comparator screenshots</h3>
+<p>{{ alternatives.screenshots_note }}</p>
+{% for screenshot in alternatives.screenshots %}
+<figure>
+  <img class="research-screenshot" src="{% static screenshot.image %}" alt="{{ screenshot.figure }}: {{ screenshot.caption }}" loading="lazy">
+  <figcaption><strong>{{ screenshot.figure }}.</strong> {{ screenshot.caption }}</figcaption>
+</figure>
+{% endfor %}
+<p><strong>Access dates:</strong> {{ alternatives.access_date_summary }}</p>
+<h3>Pros and cons compared with our system</h3>
+<table>
+  <thead><tr><th>System</th><th>Pros</th><th>Cons compared with ours</th></tr></thead>
+  <tbody>
+    {% for item in alternatives.pros_cons %}
+    <tr><td>{{ item.system }}</td><td>{{ item.pros }}</td><td>{{ item.cons }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><strong>What our system adds:</strong> {{ alternatives.system_adds }}</p>
 <h2>Local comparator</h2>
-<p><strong>FIMS.</strong> {{ alternatives.local_comparator }} <span class="pending">{{ alternatives.fims_documentation }}</span></p>
+<p><strong>FIMS.</strong> {{ alternatives.local_comparator }}</p>
 <h2>Team statement</h2>
 {% for paragraph in alternatives.team_statement %}<p>{{ paragraph }}</p>{% endfor %}
-<p><strong>Before submission:</strong> {{ alternatives.before_submission }}</p>
 {% endblock %}

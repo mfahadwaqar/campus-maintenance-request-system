@@ -56,7 +56,6 @@ PERSONAS = [
             "resident-gas-pipe-fault",
         ],
         "interview_note": "Interviews: 14 November 2026, Student Village SV04, in person. Codes R1 and R2.",
-        "pending": "",
     },
     {
         "slug": "officer",
@@ -102,7 +101,6 @@ PERSONAS = [
         ],
         "scenario_slugs": ["call-center-request", "call-center-follow-up"],
         "interview_note": "Interview: 11 November 2026, OFAM Office Room 210, in person. Code S1.",
-        "pending": "",
     },
     {
         "slug": "unit-worker",
@@ -153,6 +151,5 @@ PERSONAS = [
         ],
         "scenario_slugs": ["unit-completes-repair"],
         "interview_note": "Interview: 11 November 2026, OFAM Office Room 210, in person. Codes T1 (technician) and C1 (contractor).",
-        "pending": "",
     },
 ]

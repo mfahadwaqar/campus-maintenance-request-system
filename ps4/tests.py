@@ -1,7 +1,5 @@
 import re
 from pathlib import Path
-from html.parser import HTMLParser
-
 from html import unescape
 
 from django.test import SimpleTestCase
@@ -12,38 +10,6 @@ from .content.personas import PERSONAS
 from .content.prototype import PROTOTYPE
 from .content.scenarios import SCENARIOS
 from .content.study import STUDY
-
-
-class PendingBoxParser(HTMLParser):
-    VOID_ELEMENTS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
-
-    def __init__(self):
-        super().__init__()
-        self.elements = []
-        self.unboxed_pending_text = []
-
-    def handle_starttag(self, tag, attrs):
-        if tag in self.VOID_ELEMENTS:
-            return
-        attributes = dict(attrs)
-        classes = attributes.get("class", "").split()
-        parent_is_box = self.elements[-1][1] if self.elements else False
-        parent_is_noncontent = self.elements[-1][2] if self.elements else False
-        is_box = parent_is_box or "pending" in classes or "research-note" in classes
-        is_noncontent = parent_is_noncontent or tag in {"script", "style"}
-        self.elements.append((tag, is_box, is_noncontent))
-
-    def handle_endtag(self, tag):
-        for index in range(len(self.elements) - 1, -1, -1):
-            if self.elements[index][0] == tag:
-                del self.elements[index:]
-                break
-
-    def handle_data(self, data):
-        in_box = self.elements and self.elements[-1][1]
-        in_noncontent = self.elements and self.elements[-1][2]
-        if re.search(r"\bpending\b", data, re.IGNORECASE) and not in_box and not in_noncontent:
-            self.unboxed_pending_text.append(data.strip())
 
 
 class Ps4PublicPagesTests(SimpleTestCase):
@@ -97,7 +63,6 @@ class Ps4PublicPagesTests(SimpleTestCase):
             "evidence",
             "scenario_slugs",
             "interview_note",
-            "pending",
         }
         scenario_slugs = {scenario["slug"] for scenario in SCENARIOS}
 
@@ -301,7 +266,7 @@ class Ps4PublicPagesTests(SimpleTestCase):
         self.assertNotIn("routine", resident_narrative)
         self.assertNotIn("to be confirmed", resident_narrative)
 
-    def test_pending_text_is_only_rendered_inside_a_box(self):
+    def test_research_pages_have_no_pending_placeholders_or_tags(self):
         urls = [
             *self.urls,
             *(f"/ps4/personas/{persona['slug']}/" for persona in PERSONAS),
@@ -310,9 +275,10 @@ class Ps4PublicPagesTests(SimpleTestCase):
         for url in urls:
             with self.subTest(url=url):
                 response = self.client.get(url)
-                parser = PendingBoxParser()
-                parser.feed(response.content.decode())
-                self.assertEqual(parser.unboxed_pending_text, [])
+                body = response.content.decode()
+                for placeholder in ("[PENDING:", "[Team to test:", "[Title and date"):
+                    self.assertNotIn(placeholder, body)
+                self.assertNotIn('class="pending"', body)
 
     def test_q2_report_is_evidence_linked_and_anonymized(self):
         report_path = (
@@ -460,15 +426,38 @@ class Ps4PublicPagesTests(SimpleTestCase):
             "FIMS.",
             "The comparators are general-purpose service or public reporting platforms.",
             "The comparison supports building a residence-specific application only if the gaps found in interviews are real",
-            "Complete the bracketed trial results and access dates for each comparator",
-            "Title and date of the FIMS user guide, from OFAM.",
+            "Requester walkthroughs for Jira and MaintainX not completed.",
+            "The OFAM user guide was not available for review.",
+            "The public page asks for a work email",
+            "No account needed. The site's FAQ says you can report without registering",
+            "Accessed",
+            "Figure A1",
+            "Figure A6",
+            "Bad recaptcha",
+            "Sign Up for Free",
+            "What our system adds:",
         ):
             self.assertIn(phrase, body)
         self.assertEqual(len(ALTERNATIVES["comparators"]), 3)
-        for comparator in ALTERNATIVES["comparators"]:
-            self.assertIn(comparator["registration"], body)
-            self.assertIn(comparator["usability"], body)
-        self.assertIn(ALTERNATIVES["access_dates"], body)
+        self.assertIn(ALTERNATIVES["access_date_summary"], body)
+
+        def all_strings(value):
+            if isinstance(value, dict):
+                for nested_value in value.values():
+                    yield from all_strings(nested_value)
+            elif isinstance(value, list):
+                for nested_value in value:
+                    yield from all_strings(nested_value)
+            elif isinstance(value, str) and value:
+                yield value
+
+        for value in all_strings(ALTERNATIVES):
+            self.assertIn(value, body)
+
+        for screenshot in ALTERNATIVES["screenshots"]:
+            self.assertIn(f"/static/{screenshot['image']}", body)
+            image_path = Path(__file__).resolve().parent / "static" / screenshot["image"]
+            self.assertTrue(image_path.is_file())
 
     def test_prototype_page_shows_walkthrough_ratings_and_observations(self):
         response = self.client.get("/ps4/prototype/")
