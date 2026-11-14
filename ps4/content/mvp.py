@@ -7,7 +7,7 @@ MVP_DECISIONS = [
     {"feature":"Category-based unit dispatch","decision":"keep","reason":"Work is already dispatched to units by category; automatic routing remains unconfirmed.","scope":"assignment"},
     {"feature":"Resident and staff comments with follow-up flag","decision":"add","reason":"The resident follow-up problem and staff follow-up queue require linked discussion.","scope":"comments"},
     {"feature":"Contractor completion and signature photo","decision":"add","reason":"Contractors complete work on web or mobile and sometimes collect signatures.","scope":"completion"},
-    {"feature":"15-day resident verification","decision":"keep","reason":"The current process closes COMPLETED work 15 days after completion.","scope":"verification"},
+    {"feature":"Resident verification window","decision":"keep","reason":"The current process closes COMPLETED work after the resident response window.","scope":"verification"},
     {"feature":"Status guard on direct database updates","decision":"add","reason":"Allowed transitions should be enforced by the application and database.","scope":"workflow integrity"},
     {"feature":"Contractor KPI without targets","decision":"add","reason":"Units can see their own results; targets are outside the approved MVP.","scope":"reporting"},
     {"feature":"Consolidated ticket merge","decision":"remove","reason":"Follow-ups are linked but tickets are not merged.","scope":"workflow"},

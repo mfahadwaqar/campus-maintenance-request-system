@@ -2,12 +2,36 @@
 {% block title %}Alternatives{% endblock %}
 {% block content %}
 <h1>Alternatives and existing solutions</h1>
-<h2>Offline solution</h2><p class="pending">{{ alternatives.offline }}</p>
+<h2>Offline solution</h2>
+<p><strong>Approach:</strong> {{ alternatives.offline.approach }}</p>
+<p>{{ alternatives.offline.description }}</p>
+<h3>Strengths</h3>
+<ul>
+  {% for item in alternatives.offline.strengths %}
+  <li><strong>{{ item.title }}</strong> {{ item.text }}</li>
+  {% endfor %}
+</ul>
+<h3>Limitations</h3>
+<ul>{% for limitation in alternatives.offline.limitations %}<li>{{ limitation }}</li>{% endfor %}</ul>
 <h2>Commercial and public comparators</h2>
-<table><thead><tr><th>Name</th><th>Features</th><th>Registration</th><th>Usability</th><th>Limitations</th></tr></thead>
-<tbody>{% for item in alternatives.comparators %}
-<tr><td>{{ item.name }}<br>{{ item.url }}</td><td>{{ item.features }}</td><td>{{ item.registration }}</td><td>{{ item.usability }}</td><td>{{ item.limitations }}</td></tr>
-{% endfor %}</tbody></table>
-<p><strong>Local comparator:</strong> {{ alternatives.local_comparator }}</p>
-<p class="pending">{{ alternatives.application_adds }}</p>
+<table>
+  <thead><tr><th>Name</th><th>Features</th><th>Registration</th><th>Usability</th><th>Limitations</th></tr></thead>
+  <tbody>
+    {% for item in alternatives.comparators %}
+    <tr>
+      <td>{{ item.name }}</td>
+      <td>{{ item.features }}</td>
+      <td><span class="pending">{{ item.registration }}</span></td>
+      <td><span class="pending">{{ item.usability }}</span></td>
+      <td>{{ item.limitations }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p class="pending"><strong>Access dates:</strong> {{ alternatives.access_dates }}</p>
+<h2>Local comparator</h2>
+<p><strong>FIMS.</strong> {{ alternatives.local_comparator }} <span class="pending">{{ alternatives.fims_documentation }}</span></p>
+<h2>Team statement</h2>
+{% for paragraph in alternatives.team_statement %}<p>{{ paragraph }}</p>{% endfor %}
+<p><strong>Before submission:</strong> {{ alternatives.before_submission }}</p>
 {% endblock %}

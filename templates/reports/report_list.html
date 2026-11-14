@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Maintenance requests | Campus Maintenance{% endblock %}
 
@@ -19,7 +20,7 @@
                 <article class="report-row status-{{ report.status|lower }}">
                     <div>
                         <h2><a href="{% url 'reports:detail' report.id %}">{{ report.title }}</a></h2>
-                        <p><span class="ticket-tag">{{ report.ticket_no }}</span> {{ report.category }} · {{ report.building }} · {{ report.created_at|date:"M j, Y" }}</p>
+                        <p><span class="ticket-tag">{{ report.ticket_no }}</span> {{ report.category }} · {{ report.building }} · {{ report.created_at|date:"M j, Y" }} {% if report.status|is_open %}<span class="age-tag">Open {{ report.created_at|timesince }}</span>{% endif %}</p>
                     </div>
                     <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
                 </article>

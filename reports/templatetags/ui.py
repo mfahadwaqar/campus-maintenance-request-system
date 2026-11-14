@@ -50,3 +50,32 @@ def journey(status):
             }
         )
     return {"steps": steps}
+
+
+QUEUE_GROUPS = (
+    ("Needs review", ("SUBMITTED", "UNDER_REVIEW"), "var(--blue)"),
+    ("With technicians", ("ASSIGNED", "IN_PROGRESS", "ON_HOLD"), "var(--teal)"),
+    ("Reopened", ("REOPENED",), "var(--terra)"),
+    ("Finished", ("COMPLETED", "CLOSED"), "var(--green)"),
+)
+
+OPEN_STATUSES = ("SUBMITTED", "UNDER_REVIEW", "ASSIGNED", "IN_PROGRESS", "ON_HOLD", "REOPENED")
+
+
+@register.inclusion_tag("reports/_queue_summary.html")
+def queue_summary(reports):
+    """Count the reports on the current page by stage for the queue header tiles."""
+
+    statuses = [report.status for report in reports]
+    tiles = [
+        {"label": label, "count": sum(1 for s in statuses if s in group), "color": color}
+        for label, group, color in QUEUE_GROUPS
+    ]
+    return {"tiles": tiles}
+
+
+@register.filter
+def is_open(status):
+    """True while a request still needs work, so the age tag is worth showing."""
+
+    return status in OPEN_STATUSES

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Call Center Staff dashboard | Campus Maintenance{% endblock %}
 
@@ -7,6 +8,7 @@
     <p class="eyebrow">Call Center Staff</p>
     <h1>Maintenance request queue</h1>
     <p class="lede">Resident-submitted maintenance requests appear below.</p>
+    {% queue_summary reports %}
     <form method="get" class="filter-form">
         {% for field in filter_form %}
             <div class="form-field">
@@ -27,6 +29,7 @@
                             <span class="ticket-tag">{{ report.ticket_no }}</span>
                             Request #{{ report.id }} · {{ report.resident.get_full_name|default:report.resident.username }}
                             · {{ report.category }} · {{ report.building }}
+                            {% if report.status|is_open %}<span class="age-tag">Open {{ report.created_at|timesince }}</span>{% endif %}
                         </p>
                     </div>
                     <div class="report-actions">
