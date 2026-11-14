@@ -1,11 +1,56 @@
 {% extends "ps4/base.html" %}
+{% load static %}
 {% block title %}Prototype{% endblock %}
 {% block content %}
 <h1>Prototype and feedback</h1>
 {% for screen in prototype.screens %}
-<section><h2>{{ screen.figure }}: {{ screen.label }}</h2><p>{{ screen.note }}</p></section>
+<section class="prototype-screen">
+  <h2>{{ screen.figure }}: {{ screen.label }}</h2>
+  <figure>
+    <img class="prototype-screenshot" src="{% static screen.image %}" alt="{{ screen.figure }}: {{ screen.label }} screenshot" loading="lazy">
+    <figcaption>{{ screen.note }}</figcaption>
+  </figure>
+</section>
 {% endfor %}
-<p class="pending">{{ prototype.feedback }}</p>
-<p class="pending">{{ prototype.suggestions }}</p>
-<p class="pending">{{ prototype.walkthrough_screen }}</p>
+<section>
+  <h2>Gaps in the app that the feedback exposed</h2>
+  <table>
+    <thead><tr><th>Gap</th><th>What the feedback showed</th><th>What the app does now</th><th>Change</th></tr></thead>
+    <tbody>
+      {% for gap in prototype.feedback_gaps %}
+      <tr>
+        <td>{{ gap.gap }}</td>
+        <td>{{ gap.feedback }}</td>
+        <td>{{ gap.current }}</td>
+        <td>{{ gap.change }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section>
+  <h2>3. Which steps were understandable, confusing, missing or unnecessary</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Step</th>
+        <th>Rating</th>
+        <th>Who</th>
+        <th>Observation</th>
+        <th>Design implication</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in prototype.walkthrough_steps %}
+      <tr>
+        <td>{{ item.step }}</td>
+        <td>{{ item.rating }}</td>
+        <td>{{ item.who }}</td>
+        <td>{{ item.observation }}</td>
+        <td>{{ item.design_implication }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
 {% endblock %}

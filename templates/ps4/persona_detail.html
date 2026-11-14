@@ -2,13 +2,109 @@
 {% block title %}{{ persona.name }}{% endblock %}
 {% block content %}
 <h1>{{ persona.name }}</h1>
-<dl>
-  <dt>Role</dt><dd>{{ persona.role }}</dd>
-  <dt>Background</dt><dd>{{ persona.background }}</dd>
-  <dt>Goals</dt><dd>{{ persona.goals }}</dd>
-  <dt>Frustrations</dt><dd>{{ persona.frustrations }}</dd>
-  <dt>Constraints</dt><dd>{{ persona.constraints }}</dd>
-  <dt>Evidence</dt><dd>{{ persona.evidence_codes|join:", " }}</dd>
-</dl>
-<p class="pending">{{ persona.pending }}</p>
+<p><strong>Role:</strong> {{ persona.role }}</p>
+
+<section>
+  <h2>Summary</h2>
+  <p>{{ persona.summary }}</p>
+</section>
+
+<section>
+  <h2>Background</h2>
+  <p>{{ persona.background }}</p>
+</section>
+
+<section>
+  <h2>Goals</h2>
+  <h3>Short-term goal</h3>
+  <p>{{ persona.short_term_goal }}</p>
+  <h3>Long-term goal</h3>
+  <p>{{ persona.long_term_goal }}</p>
+</section>
+
+<section>
+  <h2>Typical tasks</h2>
+  <ul>{% for task in persona.typical_tasks %}<li>{{ task }}</li>{% endfor %}</ul>
+</section>
+
+<section>
+  <h2>Frustrations</h2>
+  <ul>{% for frustration in persona.frustrations %}<li>{{ frustration }}</li>{% endfor %}</ul>
+</section>
+
+<section>
+  <h2>Constraints</h2>
+  <ul>{% for constraint in persona.constraints %}<li>{{ constraint }}</li>{% endfor %}</ul>
+</section>
+
+<section>
+  <h2>Expectations of the application</h2>
+  <ul>{% for expectation in persona.expectations %}<li>{{ expectation }}</li>{% endfor %}</ul>
+</section>
+
+<section>
+  <h2>Gaps in the app that the feedback exposed</h2>
+  <table>
+    <thead><tr><th>Gap</th><th>What the feedback showed</th><th>What the app does now</th><th>Change</th></tr></thead>
+    <tbody>
+      {% for gap in persona.feedback_gaps %}
+      <tr>
+        <td>{{ gap.gap }}</td>
+        <td>{{ gap.feedback }}</td>
+        <td>{{ gap.current }}</td>
+        <td>{{ gap.change }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Evidence</h2>
+  <table>
+    <thead><tr><th>Claim</th><th>Evidence code</th><th>Evidence type</th></tr></thead>
+    <tbody>
+      {% for evidence in persona.evidence %}
+      <tr>
+        <td>{{ evidence.claim }}</td>
+        <td>{{ evidence.code }}</td>
+        <td>{{ evidence.type }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Scenarios</h2>
+  {% for scenario in linked_scenarios %}
+  <article>
+    <h3><a href="{% url 'ps4:scenario_detail' slug=scenario.slug %}">{{ scenario.title }}</a></h3>
+    <p><strong>Trigger:</strong> {{ scenario.trigger }}</p>
+    <h4>Steps</h4>
+    <ol>{% for step in scenario.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+    <p><strong>Expected outcome:</strong> {{ scenario.expected }}</p>
+    <p><strong>Exception:</strong> {{ scenario.exception }}</p>
+  </article>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Interview note</h2>
+  <p>{{ persona.interview_note }}</p>
+</section>
+
+{% if persona.pending %}
+<aside class="research-note" role="note">{{ persona.pending }}</aside>
+{% endif %}
+
+<nav class="persona-navigation" aria-label="Persona navigation">
+  <a href="{% url 'ps4:index' %}">Back to PS4</a>
+  {% for other_persona in personas %}
+    {% if other_persona.slug != persona.slug %}
+    <a href="{% url 'ps4:persona_detail' slug=other_persona.slug %}">{{ other_persona.name }}</a>
+    {% endif %}
+  {% endfor %}
+</nav>
+<p>{{ study.footer }}</p>
 {% endblock %}

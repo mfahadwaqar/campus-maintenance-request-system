@@ -1,16 +1,28 @@
 {% extends "ps4/base.html" %}
-{% block title %}Problem Set 4 - Campus Maintenance Request System{% endblock %}
+{% block title %}{{ study.project }}{% endblock %}
 {% block content %}
-<h1>Problem Set 4</h1>
-<p>Campus Maintenance Request System design review and progress report.</p>
+<h1>{{ study.project }}</h1>
+<p>{{ study.course }}</p>
+<h2>Study interviews</h2>
 <ul>
-  <li><a href="{% url 'ps4:findings' %}">Findings</a></li>
-  <li><a href="{% url 'ps4:personas' %}">Personas</a></li>
-  <li><a href="{% url 'ps4:scenarios' %}">Scenarios</a></li>
-  <li><a href="{% url 'ps4:prototype' %}">Prototype and feedback</a></li>
-  <li><a href="{% url 'ps4:alternatives' %}">Alternatives</a></li>
-  <li><a href="{% url 'ps4:permissions' %}">Permissions</a></li>
-  <li><a href="{% url 'ps4:mvp' %}">MVP decisions</a></li>
-  <li><a href="{% url 'ps4:summary' %}">Summary</a></li>
+  {% for interview in study.interviews %}
+  <li>
+    <strong>{{ interview.date }}</strong> - {{ interview.mode }} -
+    {{ interview.venue }} - {{ interview.participants }}
+  </li>
+  {% endfor %}
 </ul>
+<h2>Personas</h2>
+<ul>
+  {% for persona in personas %}
+  <li><a href="{% url 'ps4:persona_detail' slug=persona.slug %}">{{ persona.name }}</a></li>
+  {% endfor %}
+</ul>
+<h2>Scenarios</h2>
+<ul>
+  {% for scenario in scenarios %}
+  <li><a href="{% url 'ps4:scenario_detail' slug=scenario.slug %}">{{ scenario.title }}</a></li>
+  {% endfor %}
+</ul>
+<p>{{ study.footer }}</p>
 {% endblock %}

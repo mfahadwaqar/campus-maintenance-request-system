@@ -6,6 +6,8 @@
 <section>
   <h2><a href="{% url 'ps4:persona_detail' slug=persona.slug %}">{{ persona.name }}</a></h2>
   <p>{{ persona.role }}</p>
+  <p>{{ persona.summary }}</p>
 </section>
 {% endfor %}
+<p><a href="{% url 'ps4:index' %}">Back to PS4</a></p>
 {% endblock %}
