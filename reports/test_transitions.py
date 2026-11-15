@@ -6,7 +6,7 @@ from django.utils import timezone
 from accounts.models import Building, Unit, User
 from assignments.models import Assignment
 from reports.models import Category, Report
-from reports.services import apply_transition
+from reports.services import _apply_system_transition, apply_transition
 from reports.transitions import ALLOWED_TRANSITIONS, seed_allowed_transitions
 
 
@@ -114,10 +114,19 @@ class TransitionTests(TestCase):
             apply_transition(report, "CLOSED", self.resident)
 
     @override_settings(REPAIR_CLOSE_DAYS=15)
+    def test_actor_role_cannot_be_overridden(self):
+        report = self.report("COMPLETED")
+        assignment = self.assignment(report)
+        assignment.completed_at = timezone.now() - timedelta(days=5)
+        assignment.save(update_fields=("completed_at",))
+        with self.assertRaises(ValidationError):
+            apply_transition(report, "CLOSED", self.resident, actor_role="SYSTEM")
+
+    @override_settings(REPAIR_CLOSE_DAYS=15)
     def test_system_cannot_close_inside_window(self):
         report = self.report("COMPLETED")
         assignment = self.assignment(report)
         assignment.completed_at = timezone.now() - timedelta(days=5)
         assignment.save(update_fields=("completed_at",))
         with self.assertRaises(ValidationError):
-            apply_transition(report, "CLOSED", self.officer, actor_role="SYSTEM")
+            _apply_system_transition(report, "CLOSED")

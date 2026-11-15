@@ -19,6 +19,9 @@ class ReportConflict(Exception):
     """Raised when a report changed since the officer opened its action form."""
 
 
+_SYSTEM_ACTOR = object()
+
+
 @dataclass(frozen=True)
 class TransitionRule:
     actor_role: str
@@ -86,14 +89,36 @@ def _validate_transition(old_status, new_status, actor, values):
 
 
 @transaction.atomic
-@transaction.atomic
 def apply_transition(report, new_status, actor, **kwargs):
-    locked = Report.objects.select_for_update().get(pk=report.pk)
-    actor_role = kwargs.pop("actor_role", actor if isinstance(actor, str) else getattr(actor, "role", None))
-    if actor_role == "SYSTEM":
-        actor_role = "SYSTEM"
-    elif actor_role not in {"RESIDENT", "CALL_CENTER_STAFF", "TECHNICIAN_CONTRACTOR"}:
+    if "actor_role" in kwargs:
+        raise ValidationError("The acting role is determined by the actor.")
+    if not getattr(actor, "is_authenticated", False):
+        raise ValidationError("An authenticated actor is required.")
+    actor_role = getattr(actor, "role", None)
+    if actor_role not in {
+        User.Role.RESIDENT,
+        User.Role.CALL_CENTER_STAFF,
+        User.Role.TECHNICIAN_CONTRACTOR,
+    }:
         raise ValidationError("A valid acting role is required.")
+    return _apply_transition(report, new_status, actor, actor_role, **kwargs)
+
+
+@transaction.atomic
+def _apply_system_transition(report, new_status, **kwargs):
+    return _apply_transition(report, new_status, _SYSTEM_ACTOR, "SYSTEM", **kwargs)
+
+
+def _apply_transition(report, new_status, actor, actor_role, **kwargs):
+    locked = Report.objects.select_for_update().get(pk=report.pk)
+    if actor_role == "SYSTEM":
+        if actor is not _SYSTEM_ACTOR:
+            raise ValidationError("Only the internal system transition may use the system role.")
+    elif (
+        not getattr(actor, "is_authenticated", False)
+        or getattr(actor, "role", None) != actor_role
+    ):
+        raise ValidationError("The acting role does not match the authenticated actor.")
 
     from django.db import connection
     with connection.cursor() as cursor:
@@ -107,7 +132,7 @@ def apply_transition(report, new_status, actor, **kwargs):
 
     old_status = locked.status
     history_actor = actor
-    if isinstance(actor, str):
+    if actor is _SYSTEM_ACTOR:
         history_actor = User.objects.filter(is_staff=True).first()
         if history_actor is None:
             history_actor = User.objects.create_superuser(username="system", email="system@example.test", password=None)

@@ -7,11 +7,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from accounts.models import Building, Unit, UnitKind, User
 from .models import Category, Comment, Photo, Report, StatusHistory
-from .services import add_comment
+from .services import add_comment, apply_transition
 
 
 def image_upload(
@@ -235,6 +236,127 @@ class ReportSubmissionTests(TestCase):
 
         self.assertContains(response, "&lt;script&gt;window.alert(1)&lt;/script&gt;")
         self.assertNotContains(response, "<script>window.alert(1)</script>")
+
+
+class TechnicianReportAccessTests(TestCase):
+    def setUp(self):
+        self.building = Building.objects.create(name="Technician Scope Building")
+        self.category = Category.objects.create(name="Technician Scope Category")
+        self.assigned_unit = Unit.objects.create(
+            name="Assigned Unit", kind=UnitKind.INTERNAL
+        )
+        self.other_unit = Unit.objects.create(name="Other Unit", kind=UnitKind.INTERNAL)
+        self.resident = User.objects.create_user(
+            username="scope_resident", role=User.Role.RESIDENT
+        )
+        self.officer = User.objects.create_user(
+            username="scope_officer", role=User.Role.CALL_CENTER_STAFF
+        )
+        self.assigned_technician = User.objects.create_user(
+            username="assigned_technician",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.assigned_unit,
+        )
+        self.unit_colleague = User.objects.create_user(
+            username="unit_colleague",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.assigned_unit,
+        )
+        self.other_technician = User.objects.create_user(
+            username="other_technician",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.other_unit,
+        )
+        self.report = Report.objects.create(
+            ticket_no="CMR-2026-821001-000001",
+            resident=self.resident,
+            category=self.category,
+            building=self.building,
+            room_location="SV04-101",
+            title="Restricted technician report",
+            description="Report body visible only to the assigned unit.",
+            channel="WEB",
+        )
+        apply_transition(
+            self.report,
+            Report.Status.ASSIGNED,
+            self.officer,
+            unit=self.assigned_unit,
+            technician=self.assigned_technician,
+        )
+        self.report.refresh_from_db()
+        self.comment = Comment.objects.create(
+            report=self.report,
+            author=self.resident,
+            body="Resident comment restricted to the assigned unit.",
+        )
+        self.photo = Photo.objects.create(
+            report=self.report,
+            uploaded_by=self.resident,
+            stage=Photo.Stage.REPORT,
+            file_path="reports/scope-test-photo.jpg",
+            content_type="image/jpeg",
+            size_bytes=1,
+        )
+
+    def test_other_unit_technician_cannot_access_report_or_related_data(self):
+        self.client.force_login(self.other_technician)
+
+        list_response = self.client.get(reverse("reports:list"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotContains(list_response, self.report.title)
+
+        restricted_urls = (
+            reverse("reports:detail", args=(self.report.pk,)),
+            reverse("reports:history", args=(self.report.pk,)),
+            reverse("reports:comments", args=(self.report.pk,)),
+            reverse(
+                "reports:photo_download",
+                args=(self.report.pk, self.photo.pk),
+            ),
+        )
+        for url in restricted_urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+        self.assertFalse(
+            Comment.objects.for_user(self.other_technician, self.report).exists()
+        )
+
+    def test_active_assignment_unit_can_access_report_and_comments(self):
+        self.client.force_login(self.unit_colleague)
+
+        detail_response = self.client.get(
+            reverse("reports:detail", args=(self.report.pk,))
+        )
+        comments_response = self.client.get(
+            reverse("reports:comments", args=(self.report.pk,))
+        )
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, self.report.title)
+        self.assertContains(detail_response, self.comment.body)
+        self.assertEqual(comments_response.status_code, 200)
+        self.assertTrue(
+            Comment.objects.for_user(self.unit_colleague, self.report).filter(
+                pk=self.comment.pk
+            ).exists()
+        )
+
+    def test_ended_assignment_does_not_grant_technician_access(self):
+        assignment = self.report.assignments.get(is_active=True)
+        assignment.is_active = False
+        assignment.ended_at = timezone.now()
+        assignment.end_reason = "REASSIGNED"
+        assignment.save(update_fields=("is_active", "ended_at", "end_reason"))
+        self.client.force_login(self.assigned_technician)
+
+        self.assertEqual(
+            self.client.get(
+                reverse("reports:detail", args=(self.report.pk,))
+            ).status_code,
+            404,
+        )
 
 
 class CommentRulesTests(TestCase):
