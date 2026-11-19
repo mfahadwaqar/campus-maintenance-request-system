@@ -8,7 +8,7 @@ from accounts.models import Building, RoomLocation, Unit, UnitKind, User
 from assignments.models import Assignment
 from notifications.models import Notification
 
-from .models import Category, Report
+from .models import Category, Report, Subcategory
 from .services import (
     assign_technician,
     complete_work,
@@ -203,6 +203,21 @@ class RequestPageNotesTests(TestCase):
         self.report.refresh_from_db()
         self.assertEqual(self.report.status, "IN_PROGRESS")
         self.assertContains(self.client.get(page), "Mark complete")
+
+    def test_subcategory_options_carry_their_category_for_filtering(self):
+        other = Category.objects.create(name="Other Category")
+        mine = Subcategory.objects.create(category=self.category, name="Water Leakage")
+        theirs = Subcategory.objects.create(category=other, name="Wiring")
+        self.client.force_login(self.resident)
+
+        response = self.client.get(reverse("reports:create"))
+
+        self.assertContains(response, f'data-category="{self.category.pk}"')
+        self.assertContains(response, f'data-category="{other.pk}"')
+        self.assertContains(response, "id_subcategory")
+        self.assertContains(response, "const sub = document.getElementById")
+        self.assertContains(response, f'value="{mine.pk}"')
+        self.assertContains(response, f'value="{theirs.pk}"')
 
     def test_open_ticket_shows_no_completion_record(self):
         response = self.resident_page()

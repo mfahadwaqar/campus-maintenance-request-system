@@ -1,0 +1,16 @@
+<script>
+    (() => {
+        const category = document.getElementById("id_category");
+        const sub = document.getElementById("id_subcategory");
+        if (!category || !sub) return;
+        const all = Array.from(sub.options);
+        const show = () => {
+            const keep = sub.value;
+            const fits = all.filter(o => o.value === "" || o.dataset.category === category.value);
+            sub.replaceChildren(...fits);
+            sub.value = fits.some(o => o.value === keep) ? keep : "";
+        };
+        category.addEventListener("change", show);
+        show();
+    })();
+</script>

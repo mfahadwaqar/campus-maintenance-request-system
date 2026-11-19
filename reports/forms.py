@@ -8,6 +8,17 @@ from .models import Category, Report, Subcategory
 from .photo_pipeline import validate_and_reencode_photo
 
 
+class CategoryAwareSelect(forms.Select):
+    """A subcategory dropdown whose options carry their category, so the page can filter them."""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        instance = getattr(value, "instance", None)
+        if instance is not None:
+            option["attrs"]["data-category"] = str(instance.category_id)
+        return option
+
+
 class ReportSubmissionForm(forms.ModelForm):
     requested_urgency = forms.ChoiceField(choices=settings.REQUESTED_URGENCY_CHOICES)
     photo = forms.FileField(required=False)
@@ -23,6 +34,7 @@ class ReportSubmissionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["subcategory"].widget = CategoryAwareSelect()
         self.fields["category"].queryset = Category.objects.filter(is_active=True)
         self.fields["building"].queryset = Building.objects.filter(is_active=True)
         self.fields["subcategory"].queryset = Subcategory.objects.filter(is_active=True)
