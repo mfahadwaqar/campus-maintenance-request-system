@@ -16,7 +16,7 @@ The personas summarize user goals, tasks, constraints, frustrations, and expecta
 | Long-term goal | Know what to expect for any repair, including how quickly it will be handled, and trust that the follow-up will happen. |
 | Typical tasks | Reports a fault in the room, or follows up on an existing report.<br>Waits for the work to be done, and checks whether it has been done.<br>Confirms, or reports again, when the work does not solve the problem.<br>Visits the office in person when a fault feels serious (R2). |
 | Frustrations | Often does not have a ticket number, so staff must find the ticket by room (S1).<br>Emails the director rather than the call center, and often does not read system replies (OFAM-1, OFAM-2).<br>Work can be done while the resident is away, and may not solve the real problem (R1).<br>Serious faults reported in person are handled quickly, but residents may not know that this route exists (R2, interpretation). |
-| Constraints | No FIMS account. Contacts the call center by phone, email, or at the counter (OFAM-1, OFAM-2).<br>May not be in the room when a technician visits (R1). |
+| Constraints | No FIMS account. Contacts the call center by phone, email, or at the counter (OFAM-1, OFAM-2).<br>May not be in the room when a Technician/Contractor visits (R1). |
 | Expectations | A clear record of what was reported and what was done.<br>A way to follow up on the same report, without starting a new one (design expectation, based on R1 and S1).<br>A notice when work is delayed, with the reason and expected date (design expectation, based on OFAM-1, OFAM-2 and T1).<br>A clear way to report a serious fault that gets same-day attention (design expectation, based on R2 and OFAM-3).<br>An email notice with the ticket number, which the resident can keep for reference (observed in R2's account). |
 
 ### Evidence
@@ -61,13 +61,13 @@ The resident was able to cook safely again once the pipe was replaced [R2].
 
 R2 received an email with a ticket number, but did not need the number because the work was resolved and the ticket was closed [R2].
 
-## Desk officer
+## Call Center Staff
 
 ### Persona summary
 
 | Field | Description |
 |---|---|
-| Name | Desk officer |
+| Name | Call Center Staff |
 | Role | Call Center Staff |
 | Summary | Takes calls and emails, issues tickets for callers, and routes jobs to units. |
 | Background | Receives requests by phone, email, and at the counter. Issues a ticket using the caller's details. Routes the job to a unit. |
@@ -99,13 +99,13 @@ When a caller has no ticket number, S1 looks up the most recent open ticket by r
 
 S1 reloads the system to see replies, and batched updates can be missed [S1].
 
-## Field technician
+## Technician/Contractor
 
 ### Persona summary
 
 | Field | Description |
 |---|---|
-| Name | Field technician |
+| Name | Technician/Contractor |
 | Role | Technician/Contractor |
 | Summary | Receives jobs as ticket numbers from the call center, works them until finished, and arranges subcontractors for larger work. |
 | Background | Works from a list of jobs in progress, not a job board (T1). Arranges quotations and purchase requests for larger work through subcontractors (T1, C1). |
@@ -145,16 +145,16 @@ C1's performance measures are reviewed quarterly and given out manually, outside
 | Scenario slug | Persona served | Evidence codes |
 |---|---|---|
 | `resident-submits` | Resident | OFAM-1, OFAM-2, R1 |
-| `call-center-request` | Desk officer | S1 |
-| `call-center-follow-up` | Desk officer | S1 |
-| `unit-completes-repair` | Field technician | T1, C1, OFAM-1, OFAM-2 |
+| `call-center-request` | Call Center Staff | S1 |
+| `call-center-follow-up` | Call Center Staff | S1 |
+| `unit-completes-repair` | Technician/Contractor | T1, C1, OFAM-1, OFAM-2 |
 | `resident-follow-up-reopen` | Resident | S1, T1 |
 | `resident-mattress-replacement` | Resident | R1 |
 | `resident-gas-pipe-fault` | Resident | R2, OFAM-3 |
 
 ## Scope note
 
-Account R2 describes a gas-pipe fault that the resident experienced as serious. OFAM confirmed that it recognised the seriousness of the fault, sent the available technician immediately, and that call center staff created and assigned the ticket at the same time (OFAM-3). The project's current workflow already allows a call center officer to move a new ticket directly to assigned, so no new workflow state is needed. The design must support a same-day path, and the report records this as a change to the workflow description.
+Account R2 describes a gas-pipe fault that the resident experienced as serious. OFAM confirmed that it recognised the seriousness of the fault, sent the available Technician/Contractor immediately, and that Call Center Staff created and assigned the ticket at the same time (OFAM-3). The project's current workflow allows Call Center Staff to move a new ticket directly to ASSIGNED, so no new workflow state is needed. The design must support a same-day path, and the report records this as a change to the workflow description.
 
 ## Limitations
 

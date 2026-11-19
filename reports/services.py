@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 from django.conf import settings
-from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
@@ -16,7 +15,9 @@ from .transitions import seed_allowed_transitions
 
 
 class ReportConflict(Exception):
-    """Raised when a report changed since the officer opened its action form."""
+    """Raised when a report changed since Call Center Staff opened its action form."""
+
+    code = "version_conflict"
 
 
 _SYSTEM_ACTOR = object()
@@ -57,11 +58,8 @@ TRANSITION_TABLE = {
     (Report.Status.IN_PROGRESS, Report.Status.COMPLETED): TransitionRule(
         User.Role.TECHNICIAN_CONTRACTOR, ("completion_notes",)
     ),
-    (Report.Status.CLOSED, Report.Status.REOPENED): TransitionRule(
+    (Report.Status.CLOSED, Report.Status.ASSIGNED): TransitionRule(
         (User.Role.RESIDENT, User.Role.CALL_CENTER_STAFF), ("reason",)
-    ),
-    (Report.Status.REOPENED, Report.Status.ASSIGNED): TransitionRule(
-        User.Role.CALL_CENTER_STAFF, ("unit",)
     ),
     (Report.Status.COMPLETED, Report.Status.CLOSED): TransitionRule("SYSTEM"),
 }
@@ -173,11 +171,11 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
         Report.Status.IN_PROGRESS, Report.Status.ON_HOLD, Report.Status.COMPLETED
     }:
         if active_assignment is None or active_assignment.technician_id != getattr(actor, "pk", None):
-            raise ValidationError("Only the assigned technician may perform this transition.")
+            raise ValidationError("Only the assigned Technician/Contractor may perform this transition.")
 
     if new_status == Report.Status.UNDER_REVIEW:
         if actor_role != User.Role.CALL_CENTER_STAFF:
-            raise ValidationError("Only an officer may begin location review.")
+            raise ValidationError("Only Call Center Staff may begin location review.")
         if not kwargs.get("room_verified"):
             raise ValidationError("Confirm the room location before beginning review.")
         locked.location_verified_by = actor
@@ -222,7 +220,7 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
         if not completion_notes:
             raise ValidationError("Completion notes are required.")
         if active_assignment is None or active_assignment.technician_id != actor.pk:
-            raise ValidationError("Only the assigned technician may complete this report.")
+            raise ValidationError("Only the assigned Technician/Contractor may complete this report.")
         active_assignment.completed_at = now
         active_assignment.completion_notes = completion_notes
         active_assignment.requester_signed_on_site = bool(kwargs.get("requester_signed_on_site", False))
@@ -240,7 +238,7 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
         if actor_role != "SYSTEM":
             raise ValidationError("Only the system closes completed reports.")
 
-    if new_status == Report.Status.REOPENED:
+    if old_status == Report.Status.CLOSED and new_status == Report.Status.ASSIGNED:
         reason = str(kwargs.get("reason", "")).strip()
         if not reason:
             raise ValidationError("A reopen reason is required.")
@@ -257,17 +255,34 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
 
     changed_assignment = active_assignment
     if old_status in {Report.Status.ASSIGNED, Report.Status.IN_PROGRESS} and new_status == Report.Status.ASSIGNED:
-        from assignments.services import reassign_assignment
         requested_technician = kwargs.get("technician")
-        requested_unit = kwargs.get("unit") or getattr(active_assignment, "unit", None) or getattr(requested_technician, "unit", None)
+        requested_unit = (
+            kwargs.get("unit")
+            or getattr(active_assignment, "unit", None)
+            or getattr(requested_technician, "unit", None)
+        )
         if requested_unit is None:
-            raise ValidationError("A unit is required for reassignment.")
+            raise ValidationError("A unit is required for assignment.")
         kwargs["unit"] = requested_unit
-        if (active_assignment and active_assignment.unit_id == requested_unit.pk
-                and active_assignment.technician_id == getattr(requested_technician, "pk", None)):
-            raise ValidationError("The requested assignment is already active.")
-        changed_assignment = reassign_assignment(locked, requested_unit, requested_technician, actor)
-    elif new_status == Report.Status.ASSIGNED:
+        if active_assignment is None:
+            from assignments.services import create_assignment
+
+            changed_assignment = create_assignment(
+                locked, requested_unit, requested_technician, actor
+            )
+        else:
+            from assignments.services import reassign_assignment
+
+            if (
+                active_assignment.unit_id == requested_unit.pk
+                and active_assignment.technician_id
+                == getattr(requested_technician, "pk", None)
+            ):
+                raise ValidationError("The requested assignment is already active.")
+            changed_assignment = reassign_assignment(
+                locked, requested_unit, requested_technician, actor
+            )
+    elif new_status == Report.Status.ASSIGNED and old_status != Report.Status.CLOSED:
         if not Assignment.objects.select_for_update().filter(report=locked, is_active=True).exists():
             requested_technician = kwargs.get("technician")
             requested_unit = kwargs.get("unit") or getattr(requested_technician, "unit", None)
@@ -295,7 +310,14 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
         assignment=changed_assignment,
         note=note,
     )
-    if new_status == Report.Status.ASSIGNED:
+    if old_status == Report.Status.CLOSED and new_status == Report.Status.ASSIGNED:
+        call_center_staff = User.objects.filter(
+            role=User.Role.CALL_CENTER_STAFF, is_active=True
+        )
+        queue_report_notifications(
+            locked, event="was reopened", recipients=call_center_staff
+        )
+    elif new_status == Report.Status.ASSIGNED:
         unit = requested_unit if "requested_unit" in locals() else changed_assignment.unit
         queue_report_notifications(locked, event="was assigned", recipients=User.objects.filter(unit=unit, is_active=True))
     elif new_status == Report.Status.REJECTED:
@@ -307,9 +329,6 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
             event=f"was put on hold: {kwargs['reason'].strip()}. Expected date: {kwargs['expected_date'].isoformat()}",
             recipients=(locked.resident,),
         )
-    elif new_status == Report.Status.REOPENED:
-        officers = User.objects.filter(role=User.Role.CALL_CENTER_STAFF, is_active=True)
-        queue_report_notifications(locked, event="was reopened", recipients=officers)
     elif new_status == Report.Status.CLOSED:
         queue_report_notifications(
             locked,
@@ -325,7 +344,7 @@ def transition_report(*, report, new_status, actor, **values):
 def start_review(
     *, report_id: int, actor: User, expected_version: int, room_verified: bool = False
 ) -> Report:
-    """Move a submitted report into officer review."""
+    """Move a submitted report into Call Center Staff review."""
 
     report = Report.objects.get(pk=report_id)
     return transition_report(
@@ -341,7 +360,7 @@ def start_review(
 def set_priority(
     *, report_id: int, priority: str, actor: User, expected_version: int
 ) -> Report:
-    """Set an officer priority while the report is under review."""
+    """Set priority as Call Center Staff while the report is under review."""
 
     if not priority or priority not in dict(Report._meta.get_field("priority").choices):
         raise ValidationError("Choose a valid priority.")
@@ -350,7 +369,7 @@ def set_priority(
         if report.version != expected_version:
             raise ReportConflict("This request changed. Refresh and try again.")
         if not actor.is_authenticated or actor.role != User.Role.CALL_CENTER_STAFF:
-            raise ValidationError("Only an officer may set priority.")
+            raise ValidationError("Only Call Center Staff may set priority.")
         if report.status != Report.Status.UNDER_REVIEW:
             raise ValidationError("Priority can only be set while under review.")
         old_priority = report.priority
@@ -396,14 +415,14 @@ def assign_technician(
     expected_version: int,
     unit=None,
 ) -> Report:
-    """Assign or reassign a technician using a locked, version-checked transition."""
+    """Assign or reassign a Technician/Contractor using a locked transition."""
 
     priority = priority or None
     unit = unit or getattr(technician, "unit", None)
     if unit is None:
         raise ValidationError("Select a unit before assigning this report.")
     if technician is not None and technician.unit_id != unit.pk:
-        raise ValidationError("The technician must belong to the selected unit.")
+        raise ValidationError("The Technician/Contractor must belong to the selected unit.")
     report = Report.objects.get(pk=report_id)
     if report.status == Report.Status.UNDER_REVIEW and not priority:
         raise ValidationError("Choose a priority before assigning this report.")
@@ -476,8 +495,8 @@ def complete_work(
     completion_notes = completion_notes.strip()
     if not completion_notes:
         raise ValidationError("Completion notes are required.")
-    if requester_signed_on_site and photo is None:
-        raise ValidationError("Upload a completion photo when the paper signature was taken on site.")
+    if not requester_signed_on_site and photo is not None:
+        raise ValidationError("A completion photo requires the on-site signature flag.")
     report = Report.objects.get(pk=report_id)
     processed_photo = validate_and_reencode_photo(photo) if photo is not None else None
     completed_report = transition_report(
@@ -489,7 +508,7 @@ def complete_work(
         requester_signed_on_site=requester_signed_on_site,
     )
     if processed_photo is not None:
-        stored_path = default_storage.save(
+        stored_path = private_photo_storage.save(
             f"reports/completions/{processed_photo.name}",
             processed_photo,
         )
@@ -580,7 +599,7 @@ def reopen_report(
 
     reopened = transition_report(
         report=report,
-        new_status=Report.Status.REOPENED,
+        new_status=Report.Status.ASSIGNED,
         actor=actor,
         expected_version=expected_version,
         reason=reason,
@@ -624,7 +643,7 @@ def add_comment(
             report=report, technician=author, is_active=True
         ).exists()
         if not assigned:
-            raise ValidationError("Only the assigned technician may comment.")
+            raise ValidationError("Only the assigned Technician/Contractor may comment.")
     comment = Comment.objects.create(
         report=report,
         author=author,
@@ -735,10 +754,10 @@ def enter_report_for_caller(
     room_verified: bool = False,
     photo=None,
 ) -> Report:
-    """Create a report entered by an officer on behalf of a resident account."""
+    """Create a report entered by Call Center Staff on behalf of a resident account."""
 
     if not submitted_by.is_authenticated or submitted_by.role != User.Role.CALL_CENTER_STAFF:
-        raise ValidationError("Staff entry must be performed by an officer.")
+        raise ValidationError("Staff entry must be performed by Call Center Staff.")
     if not resident.is_authenticated or resident.role != User.Role.RESIDENT:
         raise ValidationError("The caller must have a resident account.")
     if channel not in {Channel.PHONE, Channel.EMAIL, Channel.WALK_IN}:

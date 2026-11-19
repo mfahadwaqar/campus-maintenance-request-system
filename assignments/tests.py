@@ -19,7 +19,7 @@ from reports.services import (
 from .models import Assignment
 
 
-class OfficerAssignmentWorkflowTests(TestCase):
+class CallCenterAssignmentWorkflowTests(TestCase):
     def setUp(self):
         self.building = Building.objects.create(name="Assignment Building", zone="Zone A")
         self.category = Category.objects.create(name="Assignment Plumbing")
@@ -79,7 +79,7 @@ class OfficerAssignmentWorkflowTests(TestCase):
         self.begin_review()
         response = self.client.get(dashboard)
 
-        self.assertContains(response, "Assign technician")
+        self.assertContains(response, "Assign Technician/Contractor")
         self.assertContains(
             response,
             reverse("accounts:officer_report_detail", args=(self.report.pk,)),

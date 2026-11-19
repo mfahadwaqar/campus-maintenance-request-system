@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from assignments.forms import (
-    OfficerQueueFilterForm,
+    CallCenterQueueFilterForm,
     RejectReportForm,
     ReviewReportForm,
     SetPriorityForm,
@@ -90,7 +90,7 @@ def resident_dashboard(request):
 
 @role_required(User.Role.CALL_CENTER_STAFF)
 def officer_dashboard(request):
-    filter_form = OfficerQueueFilterForm(request.GET or None)
+    filter_form = CallCenterQueueFilterForm(request.GET or None)
     reports = Report.objects.for_user(request.user).select_related(
         "resident", "category", "building"
     ).prefetch_related(
@@ -139,10 +139,10 @@ def officer_dashboard(request):
 
 
 @login_required
-def unit_kpis(request):
+def unit_results(request):
     if request.user.role == User.Role.TECHNICIAN_CONTRACTOR:
         units = Unit.objects.filter(pk=request.user.unit_id, is_active=True)
-    elif request.user.role == User.Role.CALL_CENTER_STAFF or request.user.is_staff:
+    elif request.user.role == User.Role.CALL_CENTER_STAFF:
         units = Unit.objects.filter(is_active=True)
     else:
         raise Http404
@@ -187,7 +187,7 @@ def unit_kpis(request):
 
     return render(
         request,
-        "accounts/unit_kpis.html",
+        "accounts/unit_results.html",
         {"unit_rows": unit_rows, "period": period},
     )
 

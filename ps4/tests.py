@@ -117,8 +117,8 @@ class Ps4PublicPagesTests(SimpleTestCase):
     def test_feedback_gaps_are_shown_on_the_relevant_persona_pages(self):
         expected_gaps = {
             "resident": "The closure rule has changed",
-            "officer": "The officer queue cannot be searched by student ID or room",
-            "unit-worker": "Technicians cannot put a job on hold",
+            "officer": "The Call Center Staff queue cannot be searched by student ID or room",
+            "unit-worker": "Technician/Contractor users cannot put a job on hold",
         }
         for slug, gap_title in expected_gaps.items():
             with self.subTest(persona=slug):
@@ -217,7 +217,7 @@ class Ps4PublicPagesTests(SimpleTestCase):
         self.assertNotIn("routine", scenario_text)
         self.assertNotIn("to be confirmed", scenario_text)
         self.assertIn("same action", scenario_text)
-        self.assertIn("available technician", scenario_text)
+        self.assertIn("available technician/contractor", scenario_text)
         self.assertIn("r2", " ".join(scenario["steps"]).lower())
         self.assertIn("ofam-3", " ".join(scenario["steps"]).lower())
 
@@ -262,7 +262,7 @@ class Ps4PublicPagesTests(SimpleTestCase):
             / "Q2_personas_and_scenarios.md"
         )
         report = report_path.read_text().lower()
-        resident_narrative = report.split("### illustrative narrative", 1)[1].split("## desk officer", 1)[0]
+        resident_narrative = report.split("### illustrative narrative", 1)[1].split("## call center staff", 1)[0]
         self.assertNotIn("routine", resident_narrative)
         self.assertNotIn("to be confirmed", resident_narrative)
 
@@ -289,7 +289,7 @@ class Ps4PublicPagesTests(SimpleTestCase):
         )
         self.assertTrue(report_path.is_file())
         report = report_path.read_text()
-        for heading in ("## Resident", "## Desk officer", "## Field technician"):
+        for heading in ("## Resident", "## Call Center Staff", "## Technician/Contractor"):
             self.assertIn(heading, report)
         self.assertEqual(report.count("This narrative is illustrative"), 3)
 
@@ -316,8 +316,8 @@ class Ps4PublicPagesTests(SimpleTestCase):
         )
         scope_note = (
             "Account R2 describes a gas-pipe fault that the resident experienced as serious. "
-            "OFAM confirmed that it recognised the seriousness of the fault, sent the available technician immediately, and that call center staff created and assigned the ticket at the same time (OFAM-3). "
-            "The project's current workflow already allows a call center officer to move a new ticket directly to assigned, so no new workflow state is needed. "
+            "OFAM confirmed that it recognised the seriousness of the fault, sent the available Technician/Contractor immediately, and that Call Center Staff created and assigned the ticket at the same time (OFAM-3). "
+            "The project's current workflow allows Call Center Staff to move a new ticket directly to ASSIGNED, so no new workflow state is needed. "
             "The design must support a same-day path, and the report records this as a change to the workflow description."
         )
         self.assertIn(scope_note, report)
@@ -377,12 +377,9 @@ class Ps4PublicPagesTests(SimpleTestCase):
         )
         self.assertContains(
             response,
-            "Call-center staff (S1), contractor (C1), and technician (T1) interviews took place in person on 11 November 2026 at OFAM Building, second floor, Room 210, starting at 14:00.",
+            "Call Center Staff (S1) and Technician/Contractor (C1, T1) interviews took place in person on 11 November 2026 at OFAM Building, second floor, Room 210, starting at 14:00.",
         )
-        self.assertContains(response, "Closure timing differs across the supplied accounts")
-        self.assertContains(response, "15-day response window (OFAM-1, OFAM-2)")
-        self.assertContains(response, "three days, then immediately (S1)")
-        self.assertContains(response, "three-day grace period for reopening (S1)")
+        self.assertContains(response, "The current workflow closes work on completion and allows reopening through day three.")
         self.assertNotContains(response, "[PENDING: disagreements")
 
     def test_prototype_page_shows_the_feedback_gaps_and_changes(self):
@@ -390,10 +387,10 @@ class Ps4PublicPagesTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Gaps in the app that the feedback exposed")
         for phrase in (
-            "Technicians cannot put a job on hold",
-            "The officer queue cannot be searched by student ID or room",
+            "Technician/Contractor users cannot put a job on hold",
+            "The Call Center Staff queue cannot be searched by student ID or room",
             "The closure rule has changed",
-            "The back end supports a hold, but no screen lets the technician record it.",
+            "The back end supports a hold, but no screen lets the Technician/Contractor record it.",
             "Add a ticket-number search as well",
             "3-day grace period",
             "Block comments once the ticket is closed.",

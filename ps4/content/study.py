@@ -13,8 +13,8 @@ STUDY = {
             "date": "11 November 2026",
             "mode": "In person",
             "venue": "OFAM Office, 2nd Floor, Room 210",
-            "participants": "OFAM call-center staff (S1), technician (T1), contractor (C1)",
-            "purpose": "Workflow validation with call-center staff, technician, and contractor. Questions on practice, pain points, KPIs, and suggestions. Real-time update and room lookup needs were raised.",
+            "participants": "OFAM Call Center Staff (S1), Technician/Contractor (T1, C1)",
+            "purpose": "Workflow validation with Call Center Staff and Technician/Contractor users. Questions on practice, pain points, performance measures, and suggestions. Real-time update and room lookup needs were raised.",
         },
         {
             "date": "14 November 2026",

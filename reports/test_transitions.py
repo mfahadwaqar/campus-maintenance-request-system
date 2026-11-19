@@ -56,8 +56,6 @@ class TransitionTests(TestCase):
         _apply_system_transition(report, "CLOSED")
         if status == "CLOSED":
             return Report.objects.get(pk=report.pk)
-        if status == "REOPENED":
-            return apply_transition(report, status, self.resident, reason="Still broken")
         return report
 
     def assignment(self, report, technician=None):
@@ -68,9 +66,9 @@ class TransitionTests(TestCase):
 
     def test_exact_seed_is_idempotent(self):
         self.assertEqual(set(ALLOWED_TRANSITIONS), set(tuple(x) for x in __import__('reports.models', fromlist=['AllowedTransition']).AllowedTransition.objects.values_list('from_status','to_status','actor_role')))
-        self.assertEqual(len(ALLOWED_TRANSITIONS), 15)
+        self.assertEqual(len(ALLOWED_TRANSITIONS), 14)
         seed_allowed_transitions()
-        self.assertEqual(len(__import__('reports.models', fromlist=['AllowedTransition']).AllowedTransition.objects.all()), 15)
+        self.assertEqual(len(__import__('reports.models', fromlist=['AllowedTransition']).AllowedTransition.objects.all()), 14)
 
     def test_each_allowed_transition_succeeds(self):
         cases = [
@@ -84,7 +82,8 @@ class TransitionTests(TestCase):
             ("IN_PROGRESS", "ON_HOLD", "TECHNICIAN_CONTRACTOR", "IN_PROGRESS"),
             ("ON_HOLD", "IN_PROGRESS", "TECHNICIAN_CONTRACTOR", "ON_HOLD"),
             ("IN_PROGRESS", "COMPLETED", "TECHNICIAN_CONTRACTOR", "IN_PROGRESS"),
-            ("CLOSED", "REOPENED", "RESIDENT", "CLOSED"),
+            ("CLOSED", "ASSIGNED", "RESIDENT", "CLOSED"),
+            ("CLOSED", "ASSIGNED", "CALL_CENTER_STAFF", "CLOSED"),
         ]
         for old, new, role, _ in cases:
             report = self.report(old)
@@ -94,20 +93,19 @@ class TransitionTests(TestCase):
                 kwargs["room_verified"] = True
             if new == "REJECTED": kwargs["reason"] = "Not valid"
             if new == "ON_HOLD": kwargs.update(reason="Waiting", expected_date=timezone.localdate() + timedelta(days=7))
-            if new == "ASSIGNED":
+            if new == "ASSIGNED" and old != "CLOSED":
                 kwargs["technician"] = self.technician
                 kwargs["unit"] = self.unit
                 if old == "UNDER_REVIEW":
                     kwargs["priority"] = "MEDIUM"
+            if old == "CLOSED" and new == "ASSIGNED":
+                kwargs["reason"] = "Still broken"
             if new == "COMPLETED":
                 assignment = self.assignment(report)
                 kwargs["completion_notes"] = "Fixed"
             elif old in {"ASSIGNED", "IN_PROGRESS", "ON_HOLD", "REOPENED"} and new in {"IN_PROGRESS", "ON_HOLD"}:
                 if not Assignment.objects.filter(report=report, is_active=True).exists():
                     self.assignment(report)
-            elif new == "REOPENED":
-                assignment = self.assignment(report)
-                kwargs["reason"] = "Still broken"
             apply_transition(report, new, actor, **kwargs)
             report.refresh_from_db()
             self.assertEqual(report.status, new)
@@ -135,7 +133,7 @@ class TransitionTests(TestCase):
     def test_actor_role_cannot_be_overridden(self):
         report = self.report("CLOSED")
         with self.assertRaises(ValidationError):
-            apply_transition(report, "REOPENED", self.resident, actor_role="SYSTEM")
+            apply_transition(report, "ASSIGNED", self.resident, actor_role="SYSTEM")
 
     def test_system_closes_completed_report_immediately(self):
         report = self.report("COMPLETED")
@@ -148,5 +146,5 @@ class TransitionTests(TestCase):
         assignment.completed_at = timezone.now() - timedelta(days=4)
         assignment.save(update_fields=("completed_at",))
         with self.assertRaises(ValidationError) as context:
-            apply_transition(report, "REOPENED", self.resident, reason="Still broken")
+            apply_transition(report, "ASSIGNED", self.resident, reason="Still broken")
         self.assertEqual(context.exception.code, "reopen_window_closed")

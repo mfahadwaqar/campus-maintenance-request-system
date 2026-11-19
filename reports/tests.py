@@ -417,7 +417,7 @@ class CommentRulesTests(TestCase):
                 (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
                 (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
                 (Report.Status.CLOSED, "SYSTEM"),
-                (Report.Status.REOPENED, User.Role.RESIDENT),
+                (Report.Status.ASSIGNED, User.Role.RESIDENT),
             ]
         else:
             transitions = [(status, User.Role.SYSTEM)]
@@ -436,7 +436,7 @@ class CommentRulesTests(TestCase):
         report.refresh_from_db()
         return report
 
-    def test_completed_and_reopened_comments_succeed_and_resident_sets_flag(self):
+    def test_item_3_comments_are_allowed_after_reopening_to_assigned(self):
         for status in (Report.Status.ASSIGNED, Report.Status.REOPENED):
             with self.subTest(status=status):
                 report = self.make_report(status)

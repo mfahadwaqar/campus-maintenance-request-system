@@ -48,7 +48,7 @@
                                 <p>Assigned to: {{ report.active_assignments.0.technician.get_full_name|default:report.active_assignments.0.technician.username }}</p>
                             {% endif %}
                             <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">
-                                {% if report.status == "UNDER_REVIEW" %}Assign technician{% else %}Reassign technician{% endif %}
+                                {% if report.status == "UNDER_REVIEW" %}Assign Technician/Contractor{% else %}Reassign Technician/Contractor{% endif %}
                             </a>
                         {% endif %}
                     </div>

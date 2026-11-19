@@ -12,12 +12,12 @@ def _validate_assignment(unit, technician, officer):
     if not unit.is_active:
         raise ValidationError("Choose an active unit.")
     if not getattr(officer, "is_authenticated", False) or officer.role != User.Role.CALL_CENTER_STAFF:
-        raise ValidationError("Only an officer may assign or reassign work.")
+        raise ValidationError("Only Call Center Staff may assign or reassign work.")
     if technician is not None:
         if technician.role != User.Role.TECHNICIAN_CONTRACTOR or not technician.is_active:
-            raise ValidationError("Choose an active technician.")
+            raise ValidationError("Choose an active Technician/Contractor.")
         if technician.unit_id != unit.pk:
-            raise ValidationError("The technician must belong to the selected unit.")
+            raise ValidationError("The Technician/Contractor must belong to the selected unit.")
 
 
 def create_assignment(report, unit, technician, officer):

@@ -105,14 +105,18 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
 }
 
+API_SCHEMA_PATH = "api/schema/"
+API_DOCS_PATH = "api/docs/"
+API_SERVERS = [
+    {"url": "http://192.41.170.180", "description": "CSIM server (deployed)"},
+    {"url": "http://localhost:8000", "description": "Local development"},
+]
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Campus Maintenance Request API",
     "DESCRIPTION": "Session-authenticated API for maintenance reports and workflow.",
     "VERSION": "1.0.0",
-    "SERVERS": [
-        {"url": "http://192.41.170.180", "description": "CSIM deployed API"},
-        {"url": "http://localhost:8000", "description": "Local development"},
-    ],
+    "SERVERS": API_SERVERS,
 }
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

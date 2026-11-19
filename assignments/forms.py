@@ -95,7 +95,7 @@ class SetPriorityForm(forms.Form):
         self.fields["version"].initial = report.version
 
 
-class OfficerQueueFilterForm(forms.Form):
+class CallCenterQueueFilterForm(forms.Form):
     ticket_no = forms.CharField(max_length=30, required=False, label="Ticket number")
     student_id = forms.CharField(max_length=50, required=False, label="Student ID")
     room = forms.CharField(max_length=100, required=False, label="Room")

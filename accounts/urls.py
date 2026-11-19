@@ -46,5 +46,5 @@ urlpatterns = [
         views.technician_dashboard,
         name="technician_dashboard",
     ),
-    path("unit-kpis/", views.unit_kpis, name="unit_kpis"),
+    path("unit-results/", views.unit_results, name="unit_results"),
 ]

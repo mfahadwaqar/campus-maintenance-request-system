@@ -21,7 +21,7 @@ PERSONAS = [
         ],
         "constraints": [
             "No FIMS account. Contacts the call center by phone, email, or at the counter (OFAM-1, OFAM-2).",
-            "May not be in the room when a technician visits (R1).",
+            "May not be in the room when a Technician/Contractor visits (R1).",
         ],
         "expectations": [
             "A clear record of what was reported and what was done.",
@@ -34,8 +34,8 @@ PERSONAS = [
             {
                 "gap": "The closure rule has changed",
                 "feedback": "On 11 November, OFAM said a ticket closes immediately when the task is marked complete, with a 3-day grace period for the resident to reopen it (S1, 11 November 2026).",
-                "current": "The app closes tickets a fixed period after completion, which does not match this practice.",
-                "change": "Close the ticket on completion. Allow reopening only within 3 days of completion. Block comments once the ticket is closed.",
+                "current": "The approved workflow closes the ticket when work is completed.",
+                "change": "Close the ticket on completion. Allow reopening through day three. Block comments once the ticket is closed.",
             },
         ],
         "evidence": [
@@ -59,7 +59,7 @@ PERSONAS = [
     },
     {
         "slug": "officer",
-        "name": "Desk officer",
+        "name": "Call Center Staff",
         "role": "Call Center Staff",
         "summary": "Takes calls and emails, issues tickets for callers, and routes jobs to units.",
         "background": "Receives requests by phone, email, and at the counter. Issues a ticket using the caller's details. Routes the job to a unit.",
@@ -85,7 +85,7 @@ PERSONAS = [
         ],
         "feedback_gaps": [
             {
-                "gap": "The officer queue cannot be searched by student ID or room",
+                "gap": "The Call Center Staff queue cannot be searched by student ID or room",
                 "feedback": "Call-center staff search by student ID. When the resident does not give a ticket number, they search by room number for calls, walk-ins, and emails (S1, 11 November 2026). This was not supported in the prototype demonstration.",
                 "current": "The queue has filters only, with no search.",
                 "change": "Add a search on student ID and on room number to the queue. Add a ticket-number search as well, since residents sometimes give it.",
@@ -104,7 +104,7 @@ PERSONAS = [
     },
     {
         "slug": "unit-worker",
-        "name": "Field technician",
+        "name": "Technician/Contractor",
         "role": "Technician/Contractor",
         "summary": "Receives jobs as ticket numbers from the call center, works them until finished, and arranges subcontractors for larger work.",
         "background": "Works from a list of jobs in progress, not a job board (T1). Arranges quotations and purchase requests for larger work through subcontractors (T1, C1).",
@@ -134,7 +134,7 @@ PERSONAS = [
         ],
         "feedback_gaps": [
             {
-                "gap": "Technicians cannot put a job on hold",
+                "gap": "Technician/Contractor users cannot put a job on hold",
                 "feedback": "When parts are out of stock, the technician holds the job and tells the resident the expected wait (T1, 11 November 2026).",
                 "current": "The back end supports a hold, but no screen lets the technician record it.",
                 "change": "Add a hold form to the work order screen, with a reason and an expected date. The resident is then told the wait.",

@@ -1,9 +1,15 @@
 from django.db import DatabaseError, connection, transaction
 from django.test import TestCase
 
-from accounts.models import Building, User
+from accounts.models import Building, Unit, User
 from .models import Category, Report, StatusHistory
-from .services import submit_report
+from .services import (
+    apply_transition,
+    assign_technician,
+    start_review,
+    start_work,
+    submit_report,
+)
 
 
 class DatabaseGuardTests(TestCase):
@@ -73,3 +79,64 @@ class DatabaseGuardTests(TestCase):
 
         history.refresh_from_db()
         self.assertEqual(history.note, original_note)
+
+    def test_item_1_database_rejects_resident_and_call_center_closure(self):
+        unit = Unit.objects.create(name="Guard Unit")
+        officer = User.objects.create_user(
+            username="guard_call_center",
+            email="guard_call_center@example.test",
+            password="test",
+            role=User.Role.CALL_CENTER_STAFF,
+        )
+        technician = User.objects.create_user(
+            username="guard_technician",
+            email="guard_technician@example.test",
+            password="test",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=unit,
+        )
+        start_review(
+            report_id=self.report.pk,
+            actor=officer,
+            expected_version=self.report.version,
+            room_verified=True,
+        )
+        self.report.refresh_from_db()
+        assign_technician(
+            report_id=self.report.pk,
+            technician=technician,
+            assigned_by=officer,
+            unit=unit,
+            priority="LOW",
+            expected_version=self.report.version,
+        )
+        self.report.refresh_from_db()
+        start_work(
+            report_id=self.report.pk,
+            technician=technician,
+            expected_version=self.report.version,
+        )
+        self.report.refresh_from_db()
+        apply_transition(
+            self.report,
+            Report.Status.COMPLETED,
+            technician,
+            expected_version=self.report.version,
+            completion_notes="Completed the repair.",
+        )
+        self.report.refresh_from_db()
+
+        for actor in (self.resident, officer):
+            with self.subTest(role=actor.role):
+                with self.assertRaises(DatabaseError):
+                    with transaction.atomic():
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                "SELECT set_config('app.current_user_role', %s, true)",
+                                [actor.role],
+                            )
+                        Report.objects.filter(pk=self.report.pk).update(
+                            status=Report.Status.CLOSED
+                        )
+                self.report.refresh_from_db()
+                self.assertEqual(self.report.status, Report.Status.COMPLETED)

@@ -17,10 +17,10 @@
                     <a href="{% url 'reports:list' %}">Requests</a>
                 {% elif user.role == "CALL_CENTER_STAFF" %}
                     <a href="{% url 'accounts:officer_dashboard' %}">Dashboard</a>
-                    <a href="{% url 'accounts:unit_kpis' %}">Unit results</a>
+                    <a href="{% url 'accounts:unit_results' %}">Unit results</a>
                 {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
                     <a href="{% url 'accounts:technician_dashboard' %}">Dashboard</a>
-                    <a href="{% url 'accounts:unit_kpis' %}">Unit results</a>
+                    <a href="{% url 'accounts:unit_results' %}">Unit results</a>
                 {% endif %}
                 {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
                 <details>

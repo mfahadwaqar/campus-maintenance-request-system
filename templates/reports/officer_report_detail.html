@@ -48,9 +48,9 @@
             </form>
         </section>
         <section>
-            <h2>Assign technician</h2>
-            <p>Select a technician and set the priority together on the assignment form.</p>
-            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose technician</a>
+            <h2>Assign Technician/Contractor</h2>
+            <p>Select a Technician/Contractor and set the priority together on the assignment form.</p>
+            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose Technician/Contractor</a>
         </section>
         <section>
             <h2>Reject request</h2>
@@ -75,7 +75,7 @@
                 <li>No assignments recorded.</li>
             {% endfor %}
         </ul>
-        <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Reassign technician</a>
+        <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Reassign Technician/Contractor</a>
     {% elif report.status == "CLOSED" and reopen_form %}
         <section>
             <h2>Reopen ticket within three days</h2>
@@ -92,6 +92,6 @@
 
     <p><a href="{% url 'reports:history' report.id %}">View full status history</a></p>
     {% include "reports/_comments.html" %}
-    <p><a href="{% url 'accounts:officer_dashboard' %}">Back to queue</a></p>
+    <p><a href="{% url 'accounts:officer_dashboard' %}">Back to Call Center Staff queue</a></p>
 </article>
 {% endblock %}

@@ -10,6 +10,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
     OpenApiTypes,
     extend_schema,
     extend_schema_field,
@@ -88,6 +90,23 @@ class ReportSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ApiErrorSerializer(serializers.Serializer):
+    error = serializers.ChoiceField(
+        choices=(
+            "ticket_closed",
+            "reopen_window_closed",
+            "ticket_not_closed",
+            "version_conflict",
+        ),
+        required=False,
+    )
+    detail = serializers.JSONField()
+
+
+class ApiDetailErrorSerializer(serializers.Serializer):
+    detail = serializers.JSONField()
+
+
 class ReportCreateSerializer(serializers.Serializer):
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.filter(is_active=True)
@@ -143,7 +162,6 @@ class ReportCreateSerializer(serializers.Serializer):
 class AssignmentCreateSerializer(serializers.Serializer):
     unit = serializers.PrimaryKeyRelatedField(
         queryset=Unit.objects.filter(is_active=True),
-        required=False,
     )
     technician = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(
@@ -158,7 +176,7 @@ class AssignmentCreateSerializer(serializers.Serializer):
         allow_null=True,
         allow_blank=True,
     )
-    version = serializers.IntegerField(min_value=1)
+    version = serializers.IntegerField(min_value=0)
 
     def validate(self, attrs):
         unit = attrs.get("unit") or getattr(attrs.get("technician"), "unit", None)
@@ -167,13 +185,13 @@ class AssignmentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError({"unit": "Select an active unit."})
         if technician is not None and technician.unit_id != unit.pk:
             raise serializers.ValidationError(
-                {"technician": "The technician must belong to the selected unit."}
+                {"technician": "The Technician/Contractor must belong to the selected unit."}
             )
         attrs["unit"] = unit
         return attrs
 
 
-class OfficerReportCreateSerializer(ReportCreateSerializer):
+class CallCenterReportCreateSerializer(ReportCreateSerializer):
     resident = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role=User.Role.RESIDENT, is_active=True)
     )
@@ -203,7 +221,7 @@ class OfficerReportCreateSerializer(ReportCreateSerializer):
         technician = attrs.get("technician")
         if technician and unit is not None and technician.unit_id != unit.pk:
             raise serializers.ValidationError(
-                {"technician": "The technician must belong to the selected unit."}
+                {"technician": "The Technician/Contractor must belong to the selected unit."}
             )
         if unit is not None:
             attrs["unit"] = unit
@@ -219,7 +237,7 @@ class ReportStatusUpdateSerializer(serializers.Serializer):
             Report.Status.COMPLETED,
         )
     )
-    version = serializers.IntegerField(min_value=1)
+    version = serializers.IntegerField(min_value=0)
     reason = serializers.CharField(max_length=400, required=False, allow_blank=True)
     expected_date = serializers.DateField(required=False)
     completion_notes = serializers.CharField(
@@ -233,12 +251,12 @@ class ReportStatusUpdateSerializer(serializers.Serializer):
 class VerificationSerializer(serializers.Serializer):
     rating = serializers.IntegerField(min_value=1, max_value=5, required=False, allow_null=True)
     comment = serializers.CharField(max_length=2000, required=False, allow_blank=True)
-    version = serializers.IntegerField(min_value=1)
+    version = serializers.IntegerField(min_value=0)
 
 
 class ReopenSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=1000)
-    version = serializers.IntegerField(min_value=1)
+    version = serializers.IntegerField(min_value=0)
 
 
 class CommentCreateSerializer(serializers.Serializer):
@@ -289,6 +307,34 @@ class NotificationSerializer(serializers.ModelSerializer):
             "read_at",
         )
         read_only_fields = fields
+
+
+class ReportPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = ReportSerializer(many=True)
+
+
+class CommentPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = CommentSerializer(many=True)
+
+
+class HistoryPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = HistorySerializer(many=True)
+
+
+class NotificationPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = NotificationSerializer(many=True)
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -350,7 +396,7 @@ def _validation_response(exc):
     code = getattr(exc, "code", None)
     if code in {"ticket_closed", "ticket_not_closed", "reopen_window_closed"}:
         return Response(
-            {"detail": exc.messages[0], "code": code},
+            {"error": code, "detail": exc.messages[0]},
             status=status.HTTP_409_CONFLICT,
         )
     if hasattr(exc, "message_dict"):
@@ -362,7 +408,10 @@ def _validation_response(exc):
 
 
 def _conflict_response(exc):
-    return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response(
+        {"error": getattr(exc, "code", "version_conflict"), "detail": str(exc)},
+        status=status.HTTP_409_CONFLICT,
+    )
 
 
 def _page_response(request, queryset, serializer_class, *, context=None):
@@ -373,17 +422,45 @@ def _page_response(request, queryset, serializer_class, *, context=None):
     return paginator.get_paginated_response(data)
 
 
+API_VALIDATION_RESPONSE = OpenApiResponse(
+    description="A JSON object containing serializer field errors."
+)
+API_DETAIL_ERROR_RESPONSE = OpenApiResponse(
+    response=ApiDetailErrorSerializer,
+    description="A JSON error response with a detail message.",
+)
+API_CODED_ERROR_RESPONSE = OpenApiResponse(
+    response=ApiErrorSerializer,
+    description=(
+        "A coded workflow error. The error value is ticket_closed, "
+        "reopen_window_closed, ticket_not_closed, or version_conflict."
+    ),
+)
+
+
 class ReportListCreateAPIView(APIView):
     permission_classes = (IsAuthenticated,)
 
     @extend_schema(
         operation_id="reports_list",
-        responses=ReportSerializer(many=True),
+        parameters=[
+            OpenApiParameter("page", int, description="One-based page number."),
+            OpenApiParameter("ticket_no", str, description="Exact ticket-number search; Call Center Staff only."),
+            OpenApiParameter("student_id", str, description="Exact resident username search; Call Center Staff only."),
+            OpenApiParameter("room", str, description="Case-insensitive partial room search; Call Center Staff only."),
+        ],
+        responses={
+            200: ReportPageSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Return a paginated report collection scoped to the signed-in user's role: "
-            "residents see their own reports, officers see all reports, and technicians "
-            "see reports assigned to their named account. Officers may also filter by exact "
-            "`ticket_no`, exact `student_id`, or partial `room`; these search parameters "
+            "residents see their own reports, Call Center Staff see all reports, and "
+            "Technician/Contractor users see reports assigned to their named account. "
+            "Call Center Staff may also filter by exact "
+            "`ticket_no`, exact `student_id`, or case-insensitive partial `room`; these search parameters "
             "return 403 for other roles. Supports `page`."
         ),
     )
@@ -396,9 +473,13 @@ class ReportListCreateAPIView(APIView):
             key: request.query_params.get(key, "").strip()
             for key in ("ticket_no", "student_id", "room")
         }
-        if any(search_values.values()) and request.user.role != User.Role.CALL_CENTER_STAFF:
+        search_requested = any(
+            key in request.query_params
+            for key in ("ticket_no", "student_id", "room")
+        )
+        if search_requested and request.user.role != User.Role.CALL_CENTER_STAFF:
             return Response(
-                {"detail": "Only call-center staff may search across reports."},
+                {"detail": "Only Call Center Staff may search across reports."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         if search_values["ticket_no"]:
@@ -412,7 +493,12 @@ class ReportListCreateAPIView(APIView):
     @extend_schema(
         operation_id="reports_create",
         request=ReportCreateSerializer,
-        responses={201: ReportSerializer},
+        responses={
+            201: ReportSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Create a report for the authenticated resident. Accepts JSON or multipart "
             "form data with category/building IDs, an active room-location code, title, "
@@ -451,27 +537,33 @@ class ReportListCreateAPIView(APIView):
         )
 
 
-class OfficerReportCreateAPIView(APIView):
+class CallCenterReportCreateAPIView(APIView):
     permission_classes = (IsAuthenticated,)
 
     @extend_schema(
-        operation_id="officer_reports_create",
-        request=OfficerReportCreateSerializer,
-        responses={201: ReportSerializer},
+        operation_id="call_center_reports_create",
+        request=CallCenterReportCreateSerializer,
+        responses={
+            201: ReportSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+            409: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Create a phone, email, or walk-in report on behalf of an active resident. "
-            "Call-center staff must confirm the room. When a unit is supplied, the "
-            "report and ASSIGNED transition are committed together; technician is optional."
+            "Call Center Staff must confirm the room. When a unit is supplied, the "
+            "report and ASSIGNED transition are committed together; Technician/Contractor is optional."
         ),
     )
     def post(self, request):
         """POST /api/officer/reports/: validated intake; optional unit assignment shares one transaction."""
         if request.user.role != User.Role.CALL_CENTER_STAFF:
             return Response(
-                {"detail": "Only call-center staff may enter reports for residents."},
+                {"detail": "Only Call Center Staff may enter reports for residents."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        serializer = OfficerReportCreateSerializer(data=request.data)
+        serializer = CallCenterReportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
         try:
@@ -514,10 +606,14 @@ class ReportDetailAPIView(APIView):
 
     @extend_schema(
         operation_id="reports_retrieve",
-        responses=ReportSerializer,
+        responses={
+            200: ReportSerializer,
+            401: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Retrieve one report if it is visible to the authenticated user. "
-            "Object-level visibility follows the same resident/officer/technician "
+            "Object-level visibility follows the same resident/Call Center Staff/Technician-Contractor "
             "rules as the report collection; inaccessible and nonexistent IDs return 404."
         ),
     )
@@ -533,14 +629,23 @@ class ReportStatusAPIView(APIView):
     @extend_schema(
         operation_id="reports_update_status",
         request=ReportStatusUpdateSerializer,
-        responses=ReportSerializer,
+        responses={
+            200: ReportSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+            409: API_CODED_ERROR_RESPONSE,
+        },
         description=(
             "Apply one permitted workflow transition using the shared report service. "
             "Every request includes the report `version`; stale versions return 409. "
-            "Officer transitions: UNDER_REVIEW or REJECTED (reason required). "
-            "Assigned technician transitions: IN_PROGRESS, ON_HOLD (reason and "
+            "Call Center Staff transitions: UNDER_REVIEW or REJECTED (reason required). "
+            "The assigned Technician/Contractor transitions: IN_PROGRESS, ON_HOLD (reason and "
             "expected_date required), or COMPLETED (completion_notes required; "
-            "the service immediately records CLOSED). "
+            "`requester_signed_on_site` is optional and defaults to false. A multipart "
+            "`photo` is optional when that flag is true and rejected when false. The "
+            "service immediately records CLOSED). "
             "Use the dedicated assign, verify, and reopen resources for other transitions."
         ),
     )
@@ -617,21 +722,28 @@ class ReportAssignmentAPIView(APIView):
     @extend_schema(
         operation_id="reports_assign",
         request=AssignmentCreateSerializer,
-        responses=ReportSerializer,
+        responses={
+            200: ReportSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+            409: API_CODED_ERROR_RESPONSE,
+        },
         description=(
-            "Assign or reassign a report to an active unit. Officers only. A technician is "
-            "optional, but if supplied must be active and belong to that unit. The report version "
+            "Assign or reassign a report to an active unit. Call Center Staff only. "
+            "Technician/Contractor is optional, but if supplied must be active and belong to that unit. The report version "
             "is required to prevent stale writes; initial assignment from UNDER_REVIEW "
             "also requires a priority. The service records assignment and status history "
             "atomically; stale versions and integrity conflicts return 409."
         ),
     )
     def post(self, request, report_id):
-        """POST /api/reports/{id}/assign/: officer-only assignment resource with version checks and audit history."""
+        """POST /api/reports/{id}/assign/: Call Center Staff assignment resource with version checks and audit history."""
         report = _report_for_user(request.user, report_id)
         if request.user.role != User.Role.CALL_CENTER_STAFF:
             return Response(
-                {"detail": "Only officers may assign technicians."},
+                {"detail": "Only Call Center Staff may assign a Technician/Contractor."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         serializer = AssignmentCreateSerializer(data=request.data)
@@ -664,7 +776,14 @@ class ReportVerificationAPIView(APIView):
     @extend_schema(
         operation_id="reports_verify",
         request=VerificationSerializer,
-        responses=ReportSerializer,
+        responses={
+            200: ReportSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+            409: API_CODED_ERROR_RESPONSE,
+        },
         description=(
             "Record verification feedback only after the system has closed the "
             "authenticated resident's report. Rating (1-5) and comment are optional; "
@@ -702,11 +821,18 @@ class ReportReopenAPIView(APIView):
     @extend_schema(
         operation_id="reports_reopen",
         request=ReopenSerializer,
-        responses=ReportSerializer,
+        responses={
+            200: ReportSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+            409: API_CODED_ERROR_RESPONSE,
+        },
         description=(
-            "Reopen a closed ticket within three days. The owning resident or "
-            "call-center staff must provide a nonblank reason and current version. "
-            "The service records history and notifies officers."
+            "Reopen a closed ticket through exactly day three (inclusive). The owning resident or "
+            "Call Center Staff must provide a nonblank reason and current version. "
+            "The report moves to ASSIGNED, records the reason in history, and notifies Call Center Staff."
         ),
     )
     def post(self, request, report_id):
@@ -714,7 +840,7 @@ class ReportReopenAPIView(APIView):
         report = _report_for_user(request.user, report_id)
         if request.user.role not in {User.Role.RESIDENT, User.Role.CALL_CENTER_STAFF}:
             return Response(
-                {"detail": "Only the requesting resident or call-center staff may reopen work."},
+                {"detail": "Only the requesting resident or Call Center Staff may reopen work."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         serializer = ReopenSerializer(data=request.data)
@@ -738,10 +864,19 @@ class ReportCommentsAPIView(APIView):
 
     @extend_schema(
         operation_id="reports_comments_list",
-        responses=CommentSerializer(many=True),
+        parameters=[
+            OpenApiParameter("page", int, description="One-based page number."),
+            OpenApiParameter("since", int, description="Return comment IDs greater than this non-negative ID, in ascending ID order."),
+        ],
+        responses={
+            200: CommentPageSerializer,
+            400: API_DETAIL_ERROR_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Return paginated comments for a visible report. Access is restricted to "
-            "the report's resident, officers, or technicians allowed by the active "
+            "the report's resident, Call Center Staff, or Technician/Contractor users allowed by the active "
             "assignment scope. Supports `page`."
         ),
     )
@@ -761,12 +896,19 @@ class ReportCommentsAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             comments = comments.filter(pk__gt=since_id)
+            comments = comments.order_by("pk")
         return _page_response(request, comments, CommentSerializer)
 
     @extend_schema(
         operation_id="reports_comments_create",
         request=CommentCreateSerializer,
-        responses={201: CommentSerializer},
+        responses={
+            201: CommentSerializer,
+            400: API_VALIDATION_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+            409: API_CODED_ERROR_RESPONSE,
+        },
         description=(
             "Add a public comment to a visible, non-closed report. The author is always "
             "the authenticated user; comment kind and author cannot be supplied by the "
@@ -797,10 +939,16 @@ class ReportHistoryAPIView(APIView):
 
     @extend_schema(
         operation_id="reports_history_list",
-        responses=HistorySerializer(many=True),
+        parameters=[OpenApiParameter("page", int, description="One-based page number.")],
+        responses={
+            200: HistoryPageSerializer,
+            401: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Return paginated, append-only status history for a visible report. "
-            "Residents, officers, and technicians use the same object-level report "
+            "Residents, Call Center Staff, and Technician/Contractor users use the "
+            "same object-level report "
             "visibility rules. Supports `page`."
         ),
     )
@@ -821,10 +969,14 @@ class ReportPhotoAPIView(APIView):
         responses={
             (200, "image/jpeg"): OpenApiTypes.BINARY,
             (200, "image/png"): OpenApiTypes.BINARY,
+            401: API_DETAIL_ERROR_RESPONSE,
+            404: API_DETAIL_ERROR_RESPONSE,
         },
         description=(
-            "Download a report or completion photo only when the caller can retrieve "
-            "the parent report (resident, call-center staff, or a named assignee)."
+            "Download a photo only when the caller can retrieve the parent report: "
+            "residents may access their own report photos, Call Center Staff may access "
+            "all report photos, and Technician/Contractor users may access photos only "
+            "for reports with their active assignment. Hidden and nonexistent photos return 404."
         ),
     )
     def get(self, request, report_id, photo_id):
@@ -849,9 +1001,18 @@ class NotificationListAPIView(APIView):
 
     @extend_schema(
         operation_id="notifications_list",
-        responses=NotificationSerializer(many=True),
+        parameters=[
+            OpenApiParameter("page", int, description="One-based page number."),
+            OpenApiParameter("since", int, description="Return notification IDs greater than this non-negative ID, in ascending ID order."),
+        ],
+        responses={
+            200: NotificationPageSerializer,
+            400: API_DETAIL_ERROR_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
-            "Return only notifications owned by the authenticated user, newest first. "
+            "Return only notifications owned by the authenticated user, newest first "
+            "without `since`, and ascending by record ID when `since` is supplied. "
             "The response includes the ticket identifier and notification event, not "
             "resident room, contact details, comments, or photos. Supports `page`."
         ),
@@ -873,6 +1034,7 @@ class NotificationListAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             notifications = notifications.filter(pk__gt=since_id)
+            notifications = notifications.order_by("pk")
         return _page_response(request, notifications, NotificationSerializer)
 
 
@@ -881,7 +1043,10 @@ class BuildingListAPIView(APIView):
 
     @extend_schema(
         operation_id="buildings_list",
-        responses=BuildingSerializer(many=True),
+        responses={
+            200: BuildingSerializer(many=True),
+            401: API_DETAIL_ERROR_RESPONSE,
+        },
         description="Return active buildings, including their zone, for report-location selectors.",
     )
     def get(self, request):
@@ -896,7 +1061,14 @@ class RoomLocationListAPIView(APIView):
 
     @extend_schema(
         operation_id="room_locations_list",
-        responses=RoomLocationSerializer(many=True),
+        parameters=[
+            OpenApiParameter("building", int, description="Filter by active building ID.")
+        ],
+        responses={
+            200: RoomLocationSerializer(many=True),
+            400: API_DETAIL_ERROR_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Return active seeded dorm-room and village reference codes. Village room "
             "entries are validated against the provisional SV{NN}{UNIT}{ROOM} pattern "
@@ -926,7 +1098,10 @@ class CategoryListAPIView(APIView):
 
     @extend_schema(
         operation_id="categories_list",
-        responses=CategoryReferenceSerializer(many=True),
+        responses={
+            200: CategoryReferenceSerializer(many=True),
+            401: API_DETAIL_ERROR_RESPONSE,
+        },
         description="Return active categories and their active subcategories for report forms.",
     )
     def get(self, request):
@@ -939,7 +1114,10 @@ class UnitListAPIView(APIView):
 
     @extend_schema(
         operation_id="units_list",
-        responses=UnitSerializer(many=True),
+        responses={
+            200: UnitSerializer(many=True),
+            401: API_DETAIL_ERROR_RESPONSE,
+        },
         description="Return active maintenance units and their internal/contractor kind.",
     )
     def get(self, request):
@@ -952,21 +1130,36 @@ class UnitResultsAPIView(APIView):
 
     @extend_schema(
         operation_id="unit_results",
-        responses=UnitResultSerializer(many=True),
+        parameters=[
+            OpenApiParameter(
+                "period",
+                str,
+                enum=("month", "quarter", "year", "all"),
+                default="quarter",
+                description="Date window used to count completed assignments.",
+            )
+        ],
+        responses={
+            200: UnitResultSerializer(many=True),
+            400: API_DETAIL_ERROR_RESPONSE,
+            401: API_DETAIL_ERROR_RESPONSE,
+            403: API_DETAIL_ERROR_RESPONSE,
+        },
         description=(
             "Return jobs completed and average work duration for the selected period "
-            "(month, quarter, year, or all). Technicians see only their own unit; "
-            "call-center staff see all active units."
+            "(month, quarter, year, or all). Technician/Contractor users see only their "
+            "own active unit; Call Center Staff see all active units. No targets, scores, "
+            "or rankings are returned."
         ),
     )
     def get(self, request):
         if request.user.role == User.Role.TECHNICIAN_CONTRACTOR:
             units = Unit.objects.filter(pk=request.user.unit_id, is_active=True)
-        elif request.user.role == User.Role.CALL_CENTER_STAFF or request.user.is_staff:
+        elif request.user.role == User.Role.CALL_CENTER_STAFF:
             units = Unit.objects.filter(is_active=True)
         else:
             return Response(
-                {"detail": "Residents may not access unit results."},
+                {"detail": "This role may not access unit results."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         period = request.query_params.get("period", "quarter")

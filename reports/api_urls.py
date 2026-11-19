@@ -8,8 +8,8 @@ urlpatterns = [
     path("reports/", api.ReportListCreateAPIView.as_view(), name="report-list"),
     path(
         "officer/reports/",
-        api.OfficerReportCreateAPIView.as_view(),
-        name="officer-report-create",
+        api.CallCenterReportCreateAPIView.as_view(),
+        name="call-center-report-create",
     ),
     path("reports/<int:report_id>/", api.ReportDetailAPIView.as_view(), name="report-detail"),
     path(
