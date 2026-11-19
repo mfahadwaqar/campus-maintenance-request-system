@@ -7,11 +7,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
-from accounts.models import Building, Unit, UnitKind, User
+from accounts.models import Building, RoomLocation, Unit, UnitKind, User
 from .models import Category, Comment, Photo, Report, StatusHistory
-from .services import add_comment
+from .services import add_comment, apply_transition
 
 
 def image_upload(
@@ -34,7 +35,14 @@ def image_upload(
 
 class ReportSubmissionTests(TestCase):
     def setUp(self):
-        self.building = Building.objects.create(name="Test Building", zone="Test Zone")
+        self.building = Building.objects.create(name="Dormitory A", zone="Zone 1")
+        RoomLocation.objects.get_or_create(
+            code="A204",
+            defaults={
+                "name": "Dormitory A",
+                "location_type": RoomLocation.LocationType.DORMITORY,
+            },
+        )
         self.category = Category.objects.create(name="Test Plumbing")
         self.resident = User.objects.create_user(
             username="resident", password="test-password", role=User.Role.RESIDENT
@@ -58,6 +66,7 @@ class ReportSubmissionTests(TestCase):
             "category": str(self.category.pk),
             "building": str(self.building.pk),
             "room_location": "A204",
+            "room_verified": "on",
             "title": "Leaking sink",
             "description": "Water is dripping under the sink.",
             "requested_urgency": "MEDIUM",
@@ -237,6 +246,131 @@ class ReportSubmissionTests(TestCase):
         self.assertNotContains(response, "<script>window.alert(1)</script>")
 
 
+class TechnicianReportAccessTests(TestCase):
+    def setUp(self):
+        self.building = Building.objects.create(name="Technician Scope Building")
+        self.category = Category.objects.create(name="Technician Scope Category")
+        self.assigned_unit = Unit.objects.create(
+            name="Assigned Unit", kind=UnitKind.INTERNAL
+        )
+        self.other_unit = Unit.objects.create(name="Other Unit", kind=UnitKind.INTERNAL)
+        self.resident = User.objects.create_user(
+            username="scope_resident", role=User.Role.RESIDENT
+        )
+        self.officer = User.objects.create_user(
+            username="scope_officer", role=User.Role.CALL_CENTER_STAFF
+        )
+        self.assigned_technician = User.objects.create_user(
+            username="assigned_technician",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.assigned_unit,
+        )
+        self.unit_colleague = User.objects.create_user(
+            username="unit_colleague",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.assigned_unit,
+        )
+        self.other_technician = User.objects.create_user(
+            username="other_technician",
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            unit=self.other_unit,
+        )
+        self.report = Report.objects.create(
+            ticket_no="CMR-2026-821001-000001",
+            resident=self.resident,
+            category=self.category,
+            building=self.building,
+            room_location="SV04-101",
+            title="Restricted technician report",
+            description="Report body visible only to the assigned unit.",
+            channel="WEB",
+        )
+        apply_transition(
+            self.report,
+            Report.Status.ASSIGNED,
+            self.officer,
+            unit=self.assigned_unit,
+            technician=self.assigned_technician,
+        )
+        self.report.refresh_from_db()
+        self.comment = Comment.objects.create(
+            report=self.report,
+            author=self.resident,
+            body="Resident comment restricted to the assigned unit.",
+        )
+        self.photo = Photo.objects.create(
+            report=self.report,
+            uploaded_by=self.resident,
+            stage=Photo.Stage.REPORT,
+            file_path="reports/scope-test-photo.jpg",
+            content_type="image/jpeg",
+            size_bytes=1,
+        )
+
+    def test_other_unit_technician_cannot_access_report_or_related_data(self):
+        self.client.force_login(self.other_technician)
+
+        list_response = self.client.get(reverse("reports:list"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotContains(list_response, self.report.title)
+
+        restricted_urls = (
+            reverse("reports:detail", args=(self.report.pk,)),
+            reverse("reports:history", args=(self.report.pk,)),
+            reverse("reports:comments", args=(self.report.pk,)),
+            reverse(
+                "reports:photo_download",
+                args=(self.report.pk, self.photo.pk),
+            ),
+        )
+        for url in restricted_urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+        self.assertFalse(
+            Comment.objects.for_user(self.other_technician, self.report).exists()
+        )
+
+    def test_same_unit_nonassignee_cannot_access_report_or_comments(self):
+        self.client.force_login(self.unit_colleague)
+
+        detail_response = self.client.get(
+            reverse("reports:detail", args=(self.report.pk,))
+        )
+        comments_response = self.client.get(
+            reverse("reports:comments", args=(self.report.pk,))
+        )
+
+        self.assertEqual(detail_response.status_code, 404)
+        self.assertEqual(comments_response.status_code, 404)
+        self.assertFalse(Comment.objects.for_user(self.unit_colleague, self.report).exists())
+
+    def test_named_active_assignee_can_access_report_and_comments(self):
+        self.client.force_login(self.assigned_technician)
+
+        detail_response = self.client.get(
+            reverse("reports:detail", args=(self.report.pk,))
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, self.report.title)
+        self.assertContains(detail_response, self.comment.body)
+
+    def test_ended_assignment_does_not_grant_technician_access(self):
+        assignment = self.report.assignments.get(is_active=True)
+        assignment.is_active = False
+        assignment.ended_at = timezone.now()
+        assignment.end_reason = "REASSIGNED"
+        assignment.save(update_fields=("is_active", "ended_at", "end_reason"))
+        self.client.force_login(self.assigned_technician)
+
+        self.assertEqual(
+            self.client.get(
+                reverse("reports:detail", args=(self.report.pk,))
+            ).status_code,
+            404,
+        )
+
+
 class CommentRulesTests(TestCase):
     def setUp(self):
         self.building = Building.objects.create(name="Comment Building")
@@ -272,22 +406,18 @@ class CommentRulesTests(TestCase):
                 (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
                 (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
                 (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
-                (Report.Status.CLOSED, User.Role.RESIDENT),
+                (Report.Status.CLOSED, "SYSTEM"),
             ]
-        elif status == Report.Status.COMPLETED:
-            transitions = [
-                (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
-                (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
-                (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
-                (status, User.Role.TECHNICIAN_CONTRACTOR),
-            ]
+        elif status == Report.Status.ASSIGNED:
+            transitions = [(status, User.Role.CALL_CENTER_STAFF)]
         elif status == Report.Status.REOPENED:
             transitions = [
                 (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
                 (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
                 (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
                 (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
-                (Report.Status.REOPENED, User.Role.RESIDENT),
+                (Report.Status.CLOSED, "SYSTEM"),
+                (Report.Status.ASSIGNED, User.Role.RESIDENT),
             ]
         else:
             transitions = [(status, User.Role.SYSTEM)]
@@ -306,8 +436,8 @@ class CommentRulesTests(TestCase):
         report.refresh_from_db()
         return report
 
-    def test_completed_and_reopened_comments_succeed_and_resident_sets_flag(self):
-        for status in (Report.Status.COMPLETED, Report.Status.REOPENED):
+    def test_item_3_comments_are_allowed_after_reopening_to_assigned(self):
+        for status in (Report.Status.ASSIGNED, Report.Status.REOPENED):
             with self.subTest(status=status):
                 report = self.make_report(status)
                 comment = add_comment(
@@ -318,7 +448,7 @@ class CommentRulesTests(TestCase):
                 self.assertTrue(report.awaiting_call_center_response)
 
     def test_staff_reply_clears_resident_flag(self):
-        report = self.make_report(Report.Status.COMPLETED)
+        report = self.make_report(Report.Status.ASSIGNED)
         add_comment(report_id=report.pk, author=self.resident, body="Resident update")
         add_comment(report_id=report.pk, author=self.staff, body="Staff update")
         report.refresh_from_db()
@@ -339,7 +469,7 @@ class CommentRulesTests(TestCase):
         self.assertEqual(Comment.objects.filter(report=report).count(), count)
 
     def test_comment_form_has_no_kind_field(self):
-        report = self.make_report(Report.Status.COMPLETED)
+        report = self.make_report(Report.Status.ASSIGNED)
         self.client.force_login(self.resident)
         response = self.client.get(reverse("reports:detail", args=(report.pk,)))
         self.assertEqual(response.status_code, 200)

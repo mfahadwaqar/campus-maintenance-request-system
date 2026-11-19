@@ -43,16 +43,16 @@ SCENARIOS = [
     },
     {
         "slug": "unit-completes-repair",
-        "title": "C: Technician completes a repair",
+        "title": "C: Technician/Contractor completes a repair",
         "persona": "unit-worker",
         "source": "11 November 2026 interview (T1, C1)",
-        "trigger": "A ticket is routed to the technician's unit.",
+        "trigger": "A ticket is routed to the Technician/Contractor's unit.",
         "steps": [
             "Starts work on the job.",
             "Checks the store for parts. If parts are out of stock, holds the job and tells the resident the expected wait.",
-            "Completes the repair, records notes, and collects a signature on paper if the resident is present.",
+            "Completes the repair, records notes, and records the resident's on-site signature if present.",
         ],
-        "expected": "The job is recorded as completed. The ticket closes once the work is resolved, and a satisfaction survey follows.",
+        "expected": "The job is recorded as completed and the ticket closes in the same workflow.",
         "exception": "Parts are not available for weeks. The job stays on hold with the expected date until the parts arrive.",
     },
     {
@@ -63,9 +63,9 @@ SCENARIOS = [
         "trigger": "The resident receives the completion notice or the satisfaction survey.",
         "steps": [
             "Rates the work, or reports that the problem is still there.",
-            "If reopened, the ticket returns to in progress and goes back to the unit.",
+            "If reopened, the ticket moves to ASSIGNED so Call Center Staff can select a unit and optional Technician/Contractor.",
         ],
-        "expected": "A rated ticket stays closed. A reopened ticket returns to in progress.",
+        "expected": "A rated ticket stays closed. A reopened ticket waits in ASSIGNED for staff assignment.",
         "exception": "The resident does not reply. The ticket stays closed as it is.",
     },
     {
@@ -76,7 +76,7 @@ SCENARIOS = [
         "trigger": "The resident moves into a new room and finds the provided mattress old and dirty.",
         "steps": [
             "Calls the OFAM call center to report the mattress.",
-            "Waits about two days. A staff member and technician visit while the resident is away, and clean the mattress.",
+            "Waits about two days. A staff member and Technician/Contractor visit while the resident is away, and clean the mattress.",
             "The resident finds the mattress clean but still uncomfortable (stiff in places, and deformed at the bottom edges). Makes a follow-up request by phone.",
             "The mattress is replaced about four days later.",
         ],
@@ -91,8 +91,8 @@ SCENARIOS = [
         "trigger": "The resident sees cracks in the gas pipe from the cylinder regulator to the stove, and smells gas after cooking.",
         "steps": [
             "Visits the OFAM office in person, because the fault felt serious (R2).",
-            "The call center recognises the seriousness of the fault and creates the ticket and assigns it to the available technician in the same action (OFAM-3).",
-            "The technician attends the next morning and replaces the gas pipe (R2).",
+            "Call Center Staff recognise the seriousness of the fault and create the ticket and assign it to the available Technician/Contractor in the same action (OFAM-3).",
+            "The Technician/Contractor attends the next morning and replaces the gas pipe (R2).",
             "The resident is able to cook safely again once the pipe is replaced (R2).",
             "The resident receives an email with the ticket number. The ticket is closed as soon as the work is resolved (R2).",
         ],

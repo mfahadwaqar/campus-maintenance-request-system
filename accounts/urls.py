@@ -29,6 +29,11 @@ urlpatterns = [
         views.reject_report_view,
         name="reject_report",
     ),
+    path(
+        "officer/reports/<int:report_id>/reopen/",
+        views.officer_reopen_report,
+        name="officer_reopen_report",
+    ),
     path("dashboard/", views.dashboard_redirect, name="dashboard"),
     path(
         "resident/dashboard/",
@@ -41,5 +46,5 @@ urlpatterns = [
         views.technician_dashboard,
         name="technician_dashboard",
     ),
-    path("unit-kpis/", views.unit_kpis, name="unit_kpis"),
+    path("unit-results/", views.unit_results, name="unit_results"),
 ]

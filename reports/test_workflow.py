@@ -1,9 +1,12 @@
+from datetime import timedelta
 from io import BytesIO
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from accounts.models import Building, Unit, UnitKind, User
@@ -69,6 +72,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             report_id=report.pk,
             actor=self.officer,
             expected_version=report.version,
+            room_verified=True,
         )
         return assign_technician(
             report_id=report.pk,
@@ -97,6 +101,13 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             completion_notes="Replaced the damaged pipe and tested the sink.",
         )
 
+    def set_completion_days_ago(self, report, days, now):
+        assignment = Assignment.objects.filter(
+            report=report, completed_at__isnull=False
+        ).latest("completed_at")
+        assignment.completed_at = now - timedelta(days=days)
+        assignment.save(update_fields=("completed_at",))
+
     def test_full_lifecycle_records_transitions_verification_and_notifications(self):
         report = self.create_report()
         self.assertEqual(report.status, Report.Status.SUBMITTED)
@@ -110,6 +121,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             report_id=report.pk,
             actor=self.officer,
             expected_version=report.version,
+            room_verified=True,
         )
         self.assertEqual(
             StatusHistory.objects.filter(report=report).latest("pk").new_status,
@@ -137,12 +149,12 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             completion_notes="Replaced the damaged pipe and tested the sink.",
         )
         report.refresh_from_db()
-        self.assertEqual(report.status, Report.Status.COMPLETED)
+        self.assertEqual(report.status, Report.Status.CLOSED)
         assignment.refresh_from_db()
         self.assertFalse(assignment.is_active)
         self.assertTrue(
             Notification.objects.filter(
-                report=report, message__contains="ready for verification"
+                report=report, message__contains="automatically closed after completion"
             ).exists()
         )
 
@@ -162,7 +174,36 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.assertEqual(StatusHistory.objects.filter(report=report).count(), 6)
         self.assertTrue(
             Notification.objects.filter(
-                report=report, message__contains="verified and closed"
+                report=report, message__contains="automatically closed after completion"
+            ).exists()
+        )
+
+    def test_item_1_completion_and_system_close_roll_back_together(self):
+        report = self.create_report()
+        self.begin_work(report)
+        report.refresh_from_db()
+        version_before_completion = report.version
+
+        with patch(
+            "reports.services._apply_system_transition",
+            side_effect=ValidationError("System closure failed."),
+        ):
+            with self.assertRaises(ValidationError):
+                complete_work(
+                    report_id=report.pk,
+                    technician=self.technician,
+                    expected_version=version_before_completion,
+                    completion_notes="Completed the repair.",
+                )
+
+        report.refresh_from_db()
+        assignment = Assignment.objects.get(report=report, is_active=True)
+        self.assertEqual(report.status, Report.Status.IN_PROGRESS)
+        self.assertEqual(report.version, version_before_completion)
+        self.assertIsNone(assignment.completed_at)
+        self.assertFalse(
+            StatusHistory.objects.filter(
+                report=report, new_status=Report.Status.COMPLETED
             ).exists()
         )
 
@@ -173,12 +214,16 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
 
         reopen_report(
             report_id=report.pk,
-            resident=self.resident,
+            actor=self.resident,
             expected_version=report.version,
             reason="The sink is still leaking.",
         )
         report.refresh_from_db()
-        self.assertEqual(report.status, Report.Status.REOPENED)
+        self.assertEqual(report.status, Report.Status.ASSIGNED)
+        self.assertEqual(
+            report.status_history.latest("pk").note,
+            "The sink is still leaking.",
+        )
         self.assertTrue(
             Notification.objects.filter(
                 report=report,
@@ -200,6 +245,131 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.assertEqual(assignments[0].technician, self.technician)
         self.assertTrue(assignments[1].is_active)
         self.assertEqual(assignments[1].technician, self.other_technician)
+
+    def test_item_2_reopened_report_can_reselect_same_unit_and_technician(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+
+        reopened = reopen_report(
+            report_id=report.pk,
+            actor=self.resident,
+            expected_version=report.version,
+            reason="The repair still needs attention.",
+        )
+        self.assertEqual(reopened.status, Report.Status.ASSIGNED)
+
+        assigned = assign_technician(
+            report_id=report.pk,
+            technician=self.technician,
+            assigned_by=self.officer,
+            priority=None,
+            expected_version=reopened.version,
+            unit=self.technician.unit,
+        )
+
+        active_assignment = Assignment.objects.get(report=report, is_active=True)
+        self.assertEqual(assigned.status, Report.Status.ASSIGNED)
+        self.assertEqual(active_assignment.unit, self.technician.unit)
+        self.assertEqual(active_assignment.technician, self.technician)
+
+    def test_item_2_reopen_day_two_succeeds_for_resident(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+        now = timezone.now()
+        self.set_completion_days_ago(report, 2, now)
+
+        with patch("reports.services.timezone.now", return_value=now):
+            reopened = reopen_report(
+                report_id=report.pk,
+                actor=self.resident,
+                expected_version=report.version,
+                reason="The repair still needs attention.",
+            )
+
+        self.assertEqual(reopened.status, Report.Status.ASSIGNED)
+
+    def test_item_2_reopen_exact_day_three_succeeds(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+        now = timezone.now()
+        self.set_completion_days_ago(report, 3, now)
+
+        with patch("reports.services.timezone.now", return_value=now):
+            reopened = reopen_report(
+                report_id=report.pk,
+                actor=self.resident,
+                expected_version=report.version,
+                reason="The repair still needs attention.",
+            )
+
+        self.assertEqual(reopened.status, Report.Status.ASSIGNED)
+
+    def test_item_2_reopen_day_four_returns_reopen_window_closed(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+        now = timezone.now()
+        self.set_completion_days_ago(report, 4, now)
+
+        with patch("reports.services.timezone.now", return_value=now):
+            with self.assertRaises(ValidationError) as error:
+                reopen_report(
+                    report_id=report.pk,
+                    actor=self.resident,
+                    expected_version=report.version,
+                    reason="The repair still needs attention.",
+                )
+
+        self.assertEqual(error.exception.code, "reopen_window_closed")
+        report.refresh_from_db()
+        self.assertEqual(report.status, Report.Status.CLOSED)
+
+    def test_item_2_call_center_staff_can_reopen_within_window(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+        now = timezone.now()
+        self.set_completion_days_ago(report, 2, now)
+
+        with patch("reports.services.timezone.now", return_value=now):
+            reopened = reopen_report(
+                report_id=report.pk,
+                actor=self.officer,
+                expected_version=report.version,
+                reason="The repair needs a follow-up visit.",
+            )
+
+        self.assertEqual(reopened.status, Report.Status.ASSIGNED)
+
+    def test_item_2_call_center_staff_can_reselect_same_assignment_after_reopen(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+        reopened = reopen_report(
+            report_id=report.pk,
+            actor=self.officer,
+            expected_version=report.version,
+            reason="The repair needs a follow-up visit.",
+        )
+        reopened.refresh_from_db()
+
+        assign_technician(
+            report_id=report.pk,
+            technician=self.technician,
+            assigned_by=self.officer,
+            unit=self.technician.unit,
+            priority=None,
+            expected_version=reopened.version,
+        )
+
+        assignments = Assignment.objects.filter(report=report).order_by("pk")
+        self.assertEqual(assignments.count(), 2)
+        self.assertEqual(assignments[1].unit, assignments[0].unit)
+        self.assertEqual(assignments[1].technician, assignments[0].technician)
+        self.assertTrue(assignments[1].is_active)
 
     def test_only_active_assigned_technician_can_open_work_order_or_start_work(self):
         report = self.create_report()
@@ -268,12 +438,12 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         with self.assertRaises(ValidationError):
             reopen_report(
                 report_id=report.pk,
-                resident=self.other_resident,
+                actor=self.other_resident,
                 expected_version=report.version,
                 reason="Not my report.",
             )
         report.refresh_from_db()
-        self.assertEqual(report.status, Report.Status.COMPLETED)
+        self.assertEqual(report.status, Report.Status.CLOSED)
         self.assertFalse(Verification.objects.filter(report=report).exists())
 
     def test_all_staff_comments_are_visible_to_residents(self):
@@ -328,6 +498,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             {
                 "version": report.version,
                 "completion_notes": "Replaced the damaged part and tested it.",
+                "requester_signed_on_site": True,
                 "photo": upload,
             },
         )

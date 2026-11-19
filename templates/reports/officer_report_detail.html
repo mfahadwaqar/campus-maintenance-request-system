@@ -24,9 +24,6 @@
         <dt>Requested urgency</dt><dd>{{ report.get_requested_urgency_display }}</dd>
         <dt>Priority</dt><dd>{{ report.get_priority_display|default:"Not set" }}</dd>
         <dt>Submitted</dt><dd>{{ report.created_at|date:"M j, Y, P" }}</dd>
-        {% if report.merged_into %}
-            <dt>Master report</dt><dd>Request #{{ report.merged_into_id }}</dd>
-        {% endif %}
     </dl>
 </article>
 
@@ -40,6 +37,11 @@
         <form method="post" action="{% url 'accounts:begin_report_review' report.id %}">
             {% csrf_token %}
             {{ review_form.version }}
+            <div class="form-field">
+                {{ review_form.room_verified }}
+                {{ review_form.room_verified.label_tag }}
+                {% if review_form.room_verified.errors %}<div class="error-message" role="alert">{{ review_form.room_verified.errors }}</div>{% endif %}
+            </div>
             <button type="submit">Begin review</button>
         </form>
     </section>
@@ -58,9 +60,9 @@
             </form>
         </section>
         <section class="card">
-            <h2>Assign technician</h2>
-            <p>Select a technician and set the priority together on the assignment form.</p>
-            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose technician</a>
+            <h2>Assign Technician/Contractor</h2>
+            <p>Select a unit, an optional Technician/Contractor, and the priority on the assignment form.</p>
+            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose unit and technician</a>
         </section>
         <section class="card">
             <h2>Reject request</h2>
@@ -89,7 +91,22 @@
                 <li>No assignments recorded.</li>
             {% endfor %}
         </ul>
-        <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Reassign technician</a>
+        <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Reassign Technician/Contractor</a>
+    </section>
+{% elif report.status == "CLOSED" and reopen_form %}
+    <section class="card">
+        <h2>Reopen ticket within three days</h2>
+        <p class="lede">The resident or Call Center Staff can reopen a closed ticket for three days after completion. It returns to Assigned for reassignment.</p>
+        <form method="post" action="{% url 'accounts:officer_reopen_report' report.id %}">
+            {% csrf_token %}
+            {{ reopen_form.version }}
+            <div class="form-field">
+                {{ reopen_form.reason.label_tag }}
+                {{ reopen_form.reason }}
+                {% if reopen_form.reason.errors %}<div class="error-message" role="alert">{{ reopen_form.reason.errors }}</div>{% endif %}
+            </div>
+            <button type="submit">Reopen for reassignment</button>
+        </form>
     </section>
 {% endif %}
 
@@ -99,7 +116,7 @@
 
 <p>
     <a href="{% url 'reports:history' report.id %}">View full status history</a> ·
-    <a href="{% url 'accounts:officer_dashboard' %}">Back to queue</a>
+    <a href="{% url 'accounts:officer_dashboard' %}">Back to Call Center Staff queue</a>
 </p>
 </div>
 {% endblock %}

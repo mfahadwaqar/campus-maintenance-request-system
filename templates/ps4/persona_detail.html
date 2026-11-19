@@ -94,10 +94,6 @@
   <p>{{ persona.interview_note }}</p>
 </section>
 
-{% if persona.pending %}
-<aside class="research-note" role="note">{{ persona.pending }}</aside>
-{% endif %}
-
 <nav class="persona-navigation" aria-label="Persona navigation">
   <a href="{% url 'ps4:index' %}">Back to PS4</a>
   {% for other_persona in personas %}

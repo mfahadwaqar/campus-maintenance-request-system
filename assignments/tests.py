@@ -19,7 +19,7 @@ from reports.services import (
 from .models import Assignment
 
 
-class OfficerAssignmentWorkflowTests(TestCase):
+class CallCenterAssignmentWorkflowTests(TestCase):
     def setUp(self):
         self.building = Building.objects.create(name="Assignment Building", zone="Zone A")
         self.category = Category.objects.create(name="Assignment Plumbing")
@@ -64,7 +64,10 @@ class OfficerAssignmentWorkflowTests(TestCase):
         return reverse("assignments:assign_report", args=(self.report.pk,))
 
     def begin_review(self):
-        return self.client.post(self.review_url(), {"version": self.report.version})
+        return self.client.post(
+            self.review_url(),
+            {"version": self.report.version, "room_verified": "on"},
+        )
 
     def test_officer_dashboard_shows_review_then_assignment_option(self):
         dashboard = reverse("accounts:officer_dashboard")
@@ -76,7 +79,7 @@ class OfficerAssignmentWorkflowTests(TestCase):
         self.begin_review()
         response = self.client.get(dashboard)
 
-        self.assertContains(response, "Assign technician")
+        self.assertContains(response, "Assign Technician/Contractor")
         self.assertContains(
             response,
             reverse("accounts:officer_report_detail", args=(self.report.pk,)),
@@ -89,6 +92,7 @@ class OfficerAssignmentWorkflowTests(TestCase):
         response = self.client.post(
             self.assign_url(),
             {
+                "unit": self.unit.pk,
                 "technician": self.technician_one.pk,
                 "priority": "HIGH",
                 "version": self.report.version,
@@ -106,6 +110,7 @@ class OfficerAssignmentWorkflowTests(TestCase):
         response = self.client.post(
             self.assign_url(),
             {
+                "unit": self.unit.pk,
                 "technician": self.technician_two.pk,
                 "priority": "",
                 "version": self.report.version,
@@ -144,6 +149,7 @@ class OfficerAssignmentWorkflowTests(TestCase):
         response = self.client.post(
             self.assign_url(),
             {
+                "unit": self.unit.pk,
                 "technician": self.technician_one.pk,
                 "priority": "",
                 "version": self.report.version,
@@ -175,16 +181,17 @@ class OfficerAssignmentWorkflowTests(TestCase):
         response = self.client.post(
             self.assign_url(),
             {
+                "unit": self.unit.pk,
                 "technician": self.technician_one.pk,
                 "priority": "MEDIUM",
                 "version": 1,
             },
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(Assignment.objects.count(), 1)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Assignment.objects.count(), 0)
         self.report.refresh_from_db()
-        self.assertEqual(self.report.status, Report.Status.ASSIGNED)
+        self.assertEqual(self.report.status, Report.Status.UNDER_REVIEW)
 
     def test_resident_cannot_open_officer_assignment_form(self):
         self.client.force_login(self.resident)

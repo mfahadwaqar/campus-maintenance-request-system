@@ -1,7 +1,9 @@
 <section class="comments">
     <h2>Comments</h2>
+    <p id="comment-updated" aria-live="polite">Live updates are starting…</p>
+    <div id="comment-list" data-url="{% url 'api:report-comments' report.id %}">
     {% for comment in comments %}
-        <article class="comment">
+        <article class="comment" data-comment-id="{{ comment.id }}">
             <p class="meta">
                 <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
                 · {{ comment.created_at|date:"M j, Y, P" }}
@@ -10,8 +12,9 @@
             <p class="user-content">{{ comment.body|linebreaksbr }}</p>
         </article>
     {% empty %}
-        <p class="muted">No comments yet.</p>
+        <p class="muted" data-empty-comments>No comments yet.</p>
     {% endfor %}
+    </div>
     {% if comment_form and report.status != "CLOSED" %}
         <form method="post" action="{% url 'reports:comments' report.id %}">
             {% csrf_token %}
@@ -28,3 +31,55 @@
         <p class="muted">This ticket is closed and comments are no longer accepted.</p>
     {% endif %}
 </section>
+<script>
+    (() => {
+        const list = document.getElementById("comment-list");
+        const marker = document.getElementById("comment-updated");
+        if (!list || !marker) return;
+        let cursor = Math.max(0, ...Array.from(list.querySelectorAll("[data-comment-id]"), node => Number(node.dataset.commentId)));
+        let timer;
+        let controller;
+        let closed = false;
+        const poll = async () => {
+            controller = new AbortController();
+            try {
+                const url = new URL(list.dataset.url, window.location.href);
+                url.searchParams.set("since", String(cursor));
+                const response = await fetch(url, {
+                    credentials: "same-origin",
+                    headers: {Accept: "application/json"},
+                    signal: controller.signal,
+                });
+                if (!response.ok) throw new Error("Comment update failed.");
+                const payload = await response.json();
+                for (const item of payload.results || []) {
+                    cursor = Math.max(cursor, item.id);
+                    const article = document.createElement("article");
+                    article.className = "comment";
+                    article.dataset.commentId = String(item.id);
+                    const heading = document.createElement("p");
+                    const author = document.createElement("strong");
+                    author.textContent = "New comment";
+                    heading.append(author, document.createTextNode(` · ${new Date(item.created_at).toLocaleString()}`));
+                    const body = document.createElement("p");
+                    body.className = "user-content";
+                    body.textContent = item.body;
+                    article.append(heading, body);
+                    list.append(article);
+                }
+                list.querySelector("[data-empty-comments]")?.remove();
+                marker.textContent = `Comments updated at ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                if (error.name !== "AbortError") marker.textContent = "Comment updates unavailable; retrying.";
+            } finally {
+                if (!closed) timer = window.setTimeout(poll, 10000);
+            }
+        };
+        window.addEventListener("pagehide", () => {
+            closed = true;
+            window.clearTimeout(timer);
+            controller?.abort();
+        }, {once: true});
+        poll();
+    })();
+</script>

@@ -1,11 +1,15 @@
 from pathlib import Path
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
+from django.utils import timezone
+from assignments.models import Assignment
 
 from accounts.models import User
 from .forms import (
@@ -43,9 +47,19 @@ def report_detail(request, report_id):
     comments = Comment.objects.for_user(request.user, report).select_related("author")
     context = {"report": report, "comments": comments}
     if request.user.role == User.Role.RESIDENT and report.resident_id == request.user.pk:
-        if report.status == Report.Status.COMPLETED:
-            context["verification_form"] = VerificationForm(report=report)
-            context["reopen_form"] = ReopenReportForm(report=report)
+        if report.status == Report.Status.CLOSED:
+            if not report.verifications.filter(outcome="VERIFIED").exists():
+                context["verification_form"] = VerificationForm(report=report)
+            completed_assignment = Assignment.objects.filter(
+                report=report, completed_at__isnull=False
+            ).order_by("-completed_at", "-pk").first()
+            if (
+                completed_assignment
+                and timezone.now()
+                <= completed_assignment.completed_at
+                + timedelta(days=settings.REOPEN_WINDOW_DAYS)
+            ):
+                context["reopen_form"] = ReopenReportForm(report=report)
     context["comment_form"] = CommentForm()
     return render(request, "reports/report_detail.html", context)
 
@@ -82,7 +96,7 @@ def verify_report_view(request, report_id):
                 rating=form.cleaned_data["rating"],
                 comment=form.cleaned_data["comment"],
             )
-            messages.success(request, "You verified this completed request.")
+            messages.success(request, "Your verification feedback was recorded.")
         except (ValidationError, ReportConflict) as exc:
             messages.error(
                 request,
@@ -106,7 +120,7 @@ def reopen_report_view(request, report_id):
         try:
             reopened = reopen_report(
                 report_id=report.pk,
-                resident=request.user,
+                actor=request.user,
                 expected_version=form.cleaned_data["version"],
                 reason=form.cleaned_data["reason"],
             )
@@ -173,6 +187,8 @@ def report_create(request):
             title=form.cleaned_data["title"],
             description=form.cleaned_data["description"],
             requested_urgency=form.cleaned_data["requested_urgency"],
+            subcategory=form.cleaned_data.get("subcategory"),
+            room_verified=form.cleaned_data["room_verified"],
             photo=form.cleaned_data.get("photo"),
         )
         return redirect("reports:detail", report_id=report.pk)

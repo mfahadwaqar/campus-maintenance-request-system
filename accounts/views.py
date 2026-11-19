@@ -1,31 +1,35 @@
 from functools import wraps
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, redirect_to_login
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Prefetch
-from django.db.models import Exists, OuterRef
+from django.http import HttpResponseBadRequest
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from assignments.forms import (
-    DuplicateReportForm,
-    OfficerQueueFilterForm,
+    CallCenterQueueFilterForm,
     RejectReportForm,
     ReviewReportForm,
     SetPriorityForm,
 )
 from assignments.models import Assignment
 from reports.forms import CommentForm
+from reports.forms import ReopenReportForm
 from reports.models import Comment, Report
 from accounts.models import Unit
 from reports.services import (
     ReportConflict,
     reject_report,
+    reopen_report,
     set_priority,
     start_review,
 )
@@ -86,7 +90,7 @@ def resident_dashboard(request):
 
 @role_required(User.Role.CALL_CENTER_STAFF)
 def officer_dashboard(request):
-    filter_form = OfficerQueueFilterForm(request.GET or None)
+    filter_form = CallCenterQueueFilterForm(request.GET or None)
     reports = Report.objects.for_user(request.user).select_related(
         "resident", "category", "building"
     ).prefetch_related(
@@ -107,6 +111,12 @@ def officer_dashboard(request):
             reports = reports.filter(category=filters["category"])
         if filters["building"]:
             reports = reports.filter(building=filters["building"])
+        if filters["ticket_no"]:
+            reports = reports.filter(ticket_no=filters["ticket_no"])
+        if filters["student_id"]:
+            reports = reports.filter(resident__username=filters["student_id"])
+        if filters["room"]:
+            reports = reports.filter(room_location__icontains=filters["room"])
         if filters["follow_up"]:
             reports = reports.filter(
                 comments__author__role=User.Role.RESIDENT,
@@ -129,24 +139,36 @@ def officer_dashboard(request):
 
 
 @login_required
-def unit_kpis(request):
+def unit_results(request):
     if request.user.role == User.Role.TECHNICIAN_CONTRACTOR:
         units = Unit.objects.filter(pk=request.user.unit_id, is_active=True)
-    elif request.user.role == User.Role.CALL_CENTER_STAFF or request.user.is_staff:
+    elif request.user.role == User.Role.CALL_CENTER_STAFF:
         units = Unit.objects.filter(is_active=True)
     else:
         raise Http404
 
+    period = request.GET.get("period", "quarter")
+    period_days = {"month": 30, "quarter": 90, "year": 365}
+    if period not in {*period_days, "all"}:
+        return HttpResponseBadRequest("Choose month, quarter, year, or all for period.")
+    start = (
+        timezone.now() - timedelta(days=period_days[period])
+        if period != "all"
+        else None
+    )
     unit_rows = []
     for unit in units.order_by("name"):
         assignments = Assignment.objects.filter(
             unit=unit,
             completed_at__isnull=False,
-            started_at__isnull=False,
         )
+        if start is not None:
+            assignments = assignments.filter(completed_at__gte=start)
         durations = [
             assignment.completed_at - assignment.started_at
-            for assignment in assignments.only("started_at", "completed_at")
+            for assignment in assignments.filter(started_at__isnull=False).only(
+                "started_at", "completed_at"
+            )
         ]
         average_seconds = (
             sum(duration.total_seconds() for duration in durations) / len(durations)
@@ -156,12 +178,18 @@ def unit_kpis(request):
         unit_rows.append(
             {
                 "unit": unit,
-                "completed_jobs": len(durations),
-                "average_hours": round(average_seconds / 3600, 2),
+                "completed_jobs": assignments.count(),
+                "average_hours": (
+                    round(average_seconds / 3600, 2) if durations else None
+                ),
             }
         )
 
-    return render(request, "accounts/unit_kpis.html", {"unit_rows": unit_rows})
+    return render(
+        request,
+        "accounts/unit_results.html",
+        {"unit_rows": unit_rows, "period": period},
+    )
 
 
 def _officer_report_or_404(request, report_id):
@@ -196,7 +224,6 @@ def officer_report_detail(request, report_id):
     elif report.status == Report.Status.UNDER_REVIEW:
         context["priority_form"] = SetPriorityForm(report=report)
         context["reject_form"] = RejectReportForm(report=report)
-        context["duplicate_form"] = DuplicateReportForm(report=report)
     elif report.status in (
         Report.Status.ASSIGNED,
         Report.Status.IN_PROGRESS,
@@ -205,6 +232,17 @@ def officer_report_detail(request, report_id):
         context["assignment_url"] = reverse(
             "assignments:assign_report", args=(report.pk,)
         )
+    elif report.status == Report.Status.CLOSED:
+        completion = Assignment.objects.filter(
+            report=report, completed_at__isnull=False
+        ).order_by("-completed_at", "-pk").first()
+        if (
+            completion
+            and timezone.now()
+            <= completion.completed_at
+            + timedelta(days=settings.REOPEN_WINDOW_DAYS)
+        ):
+            context["reopen_form"] = ReopenReportForm(report=report)
     return render(request, "reports/officer_report_detail.html", context)
 
 
@@ -222,6 +260,7 @@ def begin_report_review(request, report_id):
             report_id=report.pk,
             actor=request.user,
             expected_version=form.cleaned_data["version"],
+            room_verified=form.cleaned_data["room_verified"],
         )
     except ReportConflict as exc:
         messages.error(request, str(exc))
@@ -273,6 +312,30 @@ def reject_report_view(request, report_id):
     except (ValidationError, ReportConflict) as exc:
         messages.error(
             request, "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+        )
+    return redirect("accounts:officer_report_detail", report_id=report_id)
+
+
+@role_required(User.Role.CALL_CENTER_STAFF)
+@require_POST
+def officer_reopen_report(request, report_id):
+    report = _officer_report_or_404(request, report_id)
+    form = ReopenReportForm(request.POST, report=report)
+    if not form.is_valid():
+        messages.error(request, "Provide a reason and refresh before reopening.")
+        return redirect("accounts:officer_report_detail", report_id=report_id)
+    try:
+        reopen_report(
+            report_id=report.pk,
+            actor=request.user,
+            expected_version=form.cleaned_data["version"],
+            reason=form.cleaned_data["reason"],
+        )
+        messages.success(request, "The ticket was reopened for reassignment.")
+    except (ValidationError, ReportConflict) as exc:
+        messages.error(
+            request,
+            "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
         )
     return redirect("accounts:officer_report_detail", report_id=report_id)
 

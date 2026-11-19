@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import Q
 
 
 class ReportStatus(models.TextChoices):
@@ -63,8 +64,17 @@ class ReportManager(models.Manager):
     def for_user(self, user):
         if getattr(user, "role", None) == "RESIDENT":
             return self.filter(resident=user)
-        if getattr(user, "role", None) in {"CALL_CENTER_STAFF", "TECHNICIAN_CONTRACTOR"}:
+        if getattr(user, "role", None) == "CALL_CENTER_STAFF":
             return self.get_queryset()
+        if getattr(user, "role", None) == "TECHNICIAN_CONTRACTOR":
+            if not getattr(user, "pk", None):
+                return self.none()
+            return (
+                self.get_queryset()
+                .filter(assignments__is_active=True)
+                .filter(assignments__technician_id=user.pk)
+                .distinct()
+            )
         return self.none()
 
 
@@ -140,9 +150,7 @@ class Verification(models.Model):
 
 class CommentManager(models.Manager):
     def for_user(self, user, report):
-        if getattr(user, "pk", None) == report.resident_id:
-            return self.filter(report=report)
-        if getattr(user, "role", None) in {"CALL_CENTER_STAFF", "TECHNICIAN_CONTRACTOR"}:
+        if Report.objects.for_user(user).filter(pk=report.pk).exists():
             return self.filter(report=report)
         return self.none()
 

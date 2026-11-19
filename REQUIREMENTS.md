@@ -1,7 +1,7 @@
 # Campus Maintenance Request System: Requirements for Development
 
 Course project (AST02.04 Full Stack Application Development, AIT). Build a reliable MVP of one auditable workflow:
-**resident submits request → officer reviews and assigns technician → technician updates progress → resident verifies or reopens.**
+**resident submits request → Call Center Staff reviews and assigns a unit/Technician-Contractor → Technician/Contractor updates progress → system closes completed work → resident verifies or reopens.**
 Priorities set by the supervisor: a working end to end workflow, correct database updates, rejected unauthorized operations, and blocked invalid state transitions. Anything under "Out of MVP" must NOT be built.
 
 ## 1. Stack and architecture
@@ -9,23 +9,23 @@ Priorities set by the supervisor: a working end to end workflow, correct databas
 * Python, Django (current stable), server rendered multi page application (Django templates, forms, sessions).
 * PostgreSQL. Django ORM only, no string built SQL.
 * Django REST Framework for core resources, using session authentication with CSRF.
-* Project split into apps: `accounts` (custom user, roles, permissions), `reports` (reports, photos, comments, status history, verification, search), `assignments` (technician candidates, assignment, reassignment), `notifications` (email events).
+* Project split into apps: `accounts` (custom user, roles, permissions), `reports` (reports, photos, comments, status history, verification, search), `assignments` (Technician/Contractor candidates, assignment, reassignment), `notifications` (email events).
 * All status changes go through ONE service function (`reports/services.py`), used by both views and API. No view or serializer may set `status` directly.
-* Settings split into base, dev, prod. Secrets from environment variables. Docker (Django with Gunicorn, PostgreSQL, Nginx), GitLab CI running tests on every merge request.
+* Settings split into base, dev, prod. Secrets from environment variables. Docker (Django with Gunicorn, PostgreSQL, Nginx), CI running tests on each proposed change.
 
 ## 2. Roles and permissions
 
-Role is stored on the account (`RESIDENT`, `OFFICER`, `TECHNICIAN`). It is never chosen at login. Django admin is separate and used only for account and reference data management.
+Role is stored on the account (`RESIDENT`, `CALL_CENTER_STAFF`, `TECHNICIAN_CONTRACTOR`). It is never chosen at login. Django admin is separate and used only for account and reference data management.
 
-| Action | Resident | Officer | Technician |
+| Action | Resident | Call Center Staff | Technician/Contractor |
 |---|---|---|---|
 | Create report | Yes | No | No |
 | View report | Own only | All | Only reports with their active assignment |
 | See room and contact details | Own | Yes | Only for their assigned reports |
-| Review, set priority, reject, mark duplicate | No | Yes | No |
-| Assign or reassign technician | No | Yes | No |
+| Review, set priority, reject | No | Yes | No |
+| Assign or reassign a unit and optional Technician/Contractor | No | Yes | No |
 | Start work, complete with notes and optional photo | No | No | Assigned only |
-| Verify (with rating) or reopen (with reason) | Own only | No | No |
+| Verify (optional rating) or reopen (with reason, through day three) | Own only | May reopen | No |
 | Comment | Own report | Any report | Assigned report |
 | View status history | Own report | All | Assigned report |
 
@@ -33,59 +33,62 @@ Object level checks apply on every page and API action. Unauthorized object acce
 
 ## 3. Workflow state machine
 
-Statuses: `SUBMITTED, UNDER_REVIEW, ASSIGNED, IN_PROGRESS, COMPLETED, CLOSED, REOPENED, REJECTED, MERGED`.
+Statuses: `SUBMITTED, UNDER_REVIEW, ASSIGNED, IN_PROGRESS, ON_HOLD, COMPLETED, CLOSED, REOPENED, REJECTED`.
 
 | From | To | Actor | Required |
 |---|---|---|---|
 | (new) | SUBMITTED | Resident | Valid form |
-| SUBMITTED | UNDER_REVIEW | Officer | None |
-| UNDER_REVIEW | ASSIGNED | Officer | Priority and technician |
-| UNDER_REVIEW | REJECTED | Officer | Reason (mandatory) |
-| UNDER_REVIEW | MERGED | Officer | Master report (must not be MERGED or REJECTED) |
-| ASSIGNED or IN_PROGRESS | ASSIGNED | Officer | Reassignment to a technician |
-| ASSIGNED | IN_PROGRESS | Assigned technician | None |
-| IN_PROGRESS | COMPLETED | Assigned technician | Completion notes |
-| COMPLETED | CLOSED | Requesting resident | Rating 1 to 5, optional comment |
-| COMPLETED | REOPENED | Requesting resident | Reason |
-| REOPENED | ASSIGNED | Officer | Same or different technician |
+| SUBMITTED | UNDER_REVIEW | Call Center Staff | None |
+| SUBMITTED | ASSIGNED | Call Center Staff | Unit; optional Technician/Contractor |
+| UNDER_REVIEW | ASSIGNED | Call Center Staff | Unit and priority; optional Technician/Contractor |
+| UNDER_REVIEW | REJECTED | Call Center Staff | Reason (mandatory) |
+| SUBMITTED | REJECTED | Call Center Staff | Reason (mandatory) |
+| ASSIGNED or IN_PROGRESS | ASSIGNED | Call Center Staff | Unit and optional Technician/Contractor |
+| ASSIGNED | IN_PROGRESS | Assigned Technician/Contractor | None |
+| ASSIGNED or IN_PROGRESS | ON_HOLD | Assigned Technician/Contractor | Reason and expected date |
+| ON_HOLD | IN_PROGRESS | Assigned Technician/Contractor | None |
+| IN_PROGRESS | COMPLETED | Assigned Technician/Contractor | Completion notes |
+| COMPLETED | CLOSED | System | Automatic in the completion transaction |
+| CLOSED | ASSIGNED | Requesting resident or Call Center Staff | Reason, through day three after completion |
+| ASSIGNED | ASSIGNED | Call Center Staff | Unit; optional Technician/Contractor |
 
-Any other transition is rejected with a clear error and nothing is saved. Every successful transition writes a StatusHistory row in the same transaction.
+Verification is recorded after closure, accepts an optional 1–5 rating and comment, and does not change report status. Any other transition is rejected with a clear error and nothing is saved. Every successful transition writes a StatusHistory row in the same transaction.
 
 ## 4. Data model
 
 * **User** (custom, extends AbstractUser): `role`, `building` (nullable FK), optional `phone`.
 * **Building**: `name`, `zone`. **Category**: `name`.
-* **TechnicianSpecialization**: `technician`, `category` (unique together, many to many).
-* **Report**: `resident` (PROTECT), `category` (PROTECT), `building` (PROTECT), `room_location`, `title`, `description`, `requested_urgency` (hint from resident), `priority` (set by officer), `status`, `merged_into` (self FK, nullable, PROTECT), `version` (integer), `created_at`, `updated_at`.
-* **Assignment**: `report` (FK, **one to many** so history is kept), `technician`, `assigned_by`, `assigned_at`, `is_active`, `ended_at`, `end_reason`. Constraint: a partial unique index allowing **only one active assignment per report** (`UniqueConstraint(fields=["report"], condition=Q(is_active=True))`).
+* **Report**: `resident` (PROTECT), `category` (PROTECT), `building` (PROTECT), `room_location`, `title`, `description`, `requested_urgency` (hint from resident), `priority` (set by Call Center Staff), `status`, `version` (integer), `created_at`, `updated_at`.
+* **Assignment**: `report` (FK, **one to many** so history is kept), `unit`, optional Technician/Contractor account, `assigned_by`, `assigned_at`, `is_active`, `started_at`, `completed_at`, `ended_at`, `end_reason`. Constraint: a partial unique index allowing **only one active assignment per report** (`UniqueConstraint(fields=["report"], condition=Q(is_active=True))`).
 * **Verification**: `report`, `resident`, `outcome` (`VERIFIED` or `REOPENED`), `rating` (1 to 5, check constraint, null when reopened), `comment`, `created_at`. Multiple rows allowed across reopen cycles.
-* **Comment**: `report`, `author`, `body`, `is_internal` (internal comments visible to officers and technicians only), `created_at`.
-* **Photo**: `report`, `uploaded_by`, `stage` (`REPORT` or `COMPLETION`), `file`, `uploaded_at`.
+* **Comment**: `report`, `author`, `body`, `kind` (`COMMENT` or `FOLLOW_UP`), `created_at`. Comments are visible to report participants and staff with authorized report access.
+* **Photo**: `report`, `uploaded_by`, optional `assignment`, `stage` (`REPORT` or `COMPLETION`), private `file_path`, `content_type`, `size_bytes`.
 * **StatusHistory**: `report` (PROTECT), `old_status`, `new_status`, `changed_by`, `note`, `changed_at`. **Append only: never updated, never deleted, never cascaded.**
 * **Notification**: `user`, `report`, `message`, `channel`, `status`, `created_at`, `read_at`.
 * Database constraints: CHECK on allowed status and rating values, foreign keys everywhere, indexes on `status`, `resident`, `created_at`, and on active assignments by technician.
 
-## 5. Merged reports and verification
+## 5. Verification and reopening
 
-* Officer marks a report as a duplicate of a master. The duplicate keeps its own history and its resident still sees it.
-* A merged resident sees only the master's ticket ID and status, never the master's title, room, or details.
-* Verification records are per report. The master closes when its own resident verifies. A reopen from any linked resident reopens the master. The officer is alerted.
+* Completion records `COMPLETED` and then system `CLOSED` in one transaction. The completion assignment is marked inactive.
+* The resident may verify closed work with an optional rating and comment; verification does not change the ticket status.
+* The resident or Call Center Staff may reopen a closed ticket within three days of completion, with a reason. The ticket enters `ASSIGNED` and Call Center Staff selects a unit and optional Technician/Contractor before work resumes.
+* Reopened tickets retain prior assignment and verification history.
 
 ## 6. Concurrency and integrity (explicitly required)
 
-* `assign_technician()` runs in `transaction.atomic()`, locks the report with `select_for_update()`, re checks that the status still permits assignment (and that the submitted `version` or expected status matches), deactivates the previous active assignment if reassigning, creates the new Assignment, updates status, writes StatusHistory, and increments `version`.
-* The second of two simultaneous officers receives a conflict message (HTTP 409 on the API) and nothing is saved.
+* Assignment runs in `transaction.atomic()`, locks the report with `select_for_update()`, rechecks that the status still permits assignment (and that the submitted `version` or expected status matches), deactivates the previous active assignment if reassigning, creates the new Assignment, updates status, writes StatusHistory, and increments `version`.
+* The second of two simultaneous Call Center Staff assignment attempts receives a conflict message (HTTP 409 on the API) and nothing is saved.
 * The partial unique index is the database level safety net. Catch `IntegrityError` and return the same conflict response.
-* Do not hold a lock while an officer deliberates between requests. Lock only at confirmation.
+* Do not hold a lock while Call Center Staff deliberates between requests. Lock only at confirmation.
 * Apply the same locking pattern to every status transition.
 
 ## 7. Functional requirements by role
 
-**Resident:** submit report (category, building, room, title, description, urgency hint, optional photo); list own reports with status; view detail, history and public comments; comment; verify with rating or reopen with reason; receive email updates.
+**Resident:** submit report (category, building, room, title, description, urgency hint, optional photo); list own reports with status; view detail, history and comments; comment; verify with optional rating or reopen with reason within three days; receive updates.
 
-**Officer:** queue of all reports with search, filter (status, category, building, priority) and pagination; review a report; set priority; reject with reason; mark duplicate and merge; see eligible technicians (matching specialization first) with active job count; assign or reassign; see reopened reports highlighted; add internal comments; view full history.
+**Call Center Staff:** queue of all reports with search and pagination; search by ticket number, student ID, or room; review and confirm room; reject with reason; assign or reassign a maintenance unit and optional Technician/Contractor; handle reopened reports; view full history and comments; enter reports on behalf of residents.
 
-**Technician:** queue of own active assignments; view job details needed for repair; set IN_PROGRESS; complete with required notes and optional completion photo; comment.
+**Technician/Contractor:** queue of own active assignments; view job details needed for repair; set IN_PROGRESS or ON_HOLD with reason and expected date; complete with required notes and signature flag, with an optional completion photo when signed on site; comment.
 
 **All:** login and logout, role based dashboards, activity history on every ticket, server side validation of every field.
 
@@ -96,13 +99,22 @@ Any other transition is rejected with a clear error and nothing is saved. Every 
 | `/api/reports/` | GET (filtered by role), POST | Authenticated |
 | `/api/reports/{id}/` | GET | Object level |
 | `/api/reports/{id}/status/` | PATCH | Role gated, via the service function |
-| `/api/reports/{id}/assign/` | POST | Officer only |
-| `/api/reports/{id}/verify/` and `/reopen/` | POST | Owning resident |
+| `/api/reports/{id}/assign/` | POST | Call Center Staff only |
+| `/api/reports/{id}/verify/` | POST | Owning resident |
+| `/api/reports/{id}/reopen/` | POST | Owning resident or call-center staff |
 | `/api/reports/{id}/comments/` | GET, POST | Object level |
 | `/api/reports/{id}/history/` | GET | Object level |
+| `/api/reports/{id}/photos/{photo_id}/` | GET | Object level |
+| `/api/officer/reports/` | POST | Call Center Staff |
 | `/api/notifications/` | GET | Own only |
+| `/api/buildings/`, `/api/room-locations/`, `/api/categories/`, `/api/units/` | GET | Authenticated |
+| `/api/units/results/` | GET | Call Center Staff: all active units; Technician/Contractor: own active unit |
 
 Serializers validate all input. State changing calls use POST or PATCH only, never GET.
+The OpenAPI schema and interactive API documentation are available at `/api/schema/`
+and `/api/docs/`. API authentication uses the existing Django session; browser clients
+must send a CSRF token in `X-CSRFToken` on state-changing requests. Collection endpoints
+return paginated results, and stale versioned workflow changes return HTTP 409.
 
 ## 9. Security requirements
 
@@ -114,11 +126,11 @@ Serializers validate all input. State changing calls use POST or PATCH only, nev
 
 ## 10. Notifications
 
-Email (Django email backend, console backend in development) sent via `transaction.on_commit` on: report submitted, assigned (to technician), status changes (to resident), completed (resident asked to verify), reopened (to officer), rejected (with reason). Record each in Notification, log failures, never roll back the workflow because email failed. In app notification is optional; the `/api/notifications/` endpoint may read the Notification table.
+Email (Django email backend, console backend in development) sent via `transaction.on_commit` on: report submitted, assigned, held, completed/closed (resident asked to verify), reopened (to call-center staff), and rejected (with reason). Record each in Notification, log failures, never roll back the workflow because email failed. The `/api/notifications/` endpoint returns the authenticated user's notifications and supports incremental polling with `since`.
 
 ## 11. Non functional requirements
 
-* Paginated, indexed list queries (use `select_related`). Reasonable load: about 300 residents, 3 to 5 officers, 8 to 12 technicians.
+* Paginated, indexed list queries (use `select_related`). Reasonable load: about 300 residents, 3 to 5 Call Center Staff users, 8 to 12 Technician/Contractor users.
 * Backups of database and media documented, with a tested restore.
 * Structured logging and a health check endpoint.
 * Automated tests with coverage reported in CI. Seed command creating clearly labelled synthetic users, buildings, categories, and reports.
@@ -126,11 +138,11 @@ Email (Django email backend, console backend in development) sent via `transacti
 ## 12. Acceptance criteria (tests that must exist and pass)
 
 1. **Full workflow:** one test runs submit → review → assign → in progress → complete → verify, checking database rows (Report, Assignment, StatusHistory, Verification, Notification) at every step.
-2. **Reopen and reassign:** reopen, then reassign to another technician. The old Assignment remains with `is_active=False`, and the new one is active.
+2. **Reopen and reassign:** reopen, then assign a unit and optional Technician/Contractor. The previous Assignment remains inactive, and a new one is active once staff assigns it.
 3. **Invalid transitions:** every disallowed pair in section 3, and every correct transition by the wrong role, is rejected and leaves the database unchanged.
-4. **Authorization:** two residents cannot see or change each other's reports by changing the URL or API ID. A technician cannot open an unassigned report. A resident cannot call officer endpoints. Unauthenticated requests are rejected. Hidden buttons are not relied on.
+4. **Authorization:** two residents cannot see or change each other's reports by changing the URL or API ID. A Technician/Contractor cannot open an unassigned report. A resident cannot call Call Center Staff endpoints. Unauthenticated requests are rejected. Hidden buttons are not relied on.
 5. **Concurrency:** two simultaneous assignment attempts on one report produce exactly one active assignment and one conflict response.
-6. **Merge:** merged residents see only master ID and status.
+6. **Verification and reopening:** optional rating is accepted after closure; resident or Call Center Staff reopening requires a reason and is limited to the inclusive three-day window.
 7. **Input and files:** invalid forms, oversized files, wrong file types, disguised files, and script in descriptions or comments are rejected or rendered as plain text. EXIF is removed from stored images.
 8. **CSRF:** state changes without a token fail. No state change accepts GET.
 9. **API:** each endpoint tested for success, validation failure, and permission failure.
@@ -139,8 +151,8 @@ Email (Django email backend, console backend in development) sent via `transacti
 
 1. Scaffold, settings, custom user, roles, login, Docker, CI.
 2. Reference data, Report submission with photo pipeline.
-3. Officer queue, review, reject, duplicate, priority, assignment with locking.
-4. Technician queue, progress updates, completion.
+3. Call-center intake and queue, review, reject, room verification, assignment with locking.
+4. Technician/Contractor queue, progress updates, completion.
 5. Resident verify or reopen, StatusHistory views, comments.
 6. Email notifications, search, filters, pagination.
 7. REST API and OpenAPI docs.
@@ -148,8 +160,8 @@ Email (Django email backend, console backend in development) sent via `transacti
 
 ## 14. Out of MVP (do not build)
 
-Weighted scoring or zone based ranking of technicians, automatic or batch assignment, automated duplicate detection, analytics dashboard, SLA reporting, AIT single sign on, map based location, real time or push notifications, hash chained audit logs, asset inventory, preventive maintenance. Do not add compliance claims or features that are not listed here.
+Satisfaction surveys, weighted Technician/Contractor ranking, automatic or batch assignment, automated duplicate detection, SLA reporting, AIT single sign on, map based location, real time or push notifications, hash chained audit logs, asset inventory, preventive maintenance. Unit results are limited to completed job counts and average completion time, without targets, scores, or rankings. Do not add compliance claims or features that are not listed here.
 
 ## 15. Assumptions to confirm (keep configurable)
 
-Categories, buildings, zones, priority levels, and status names are placeholders pending validation with AIT facilities staff. Accounts are created by an administrator (no open registration). Reopened tickets return to the officer for reassignment. Keep these values in data tables or settings, not hard coded.
+Categories and subcategories preserve existing values and active flags. Dormitory and Student Village locations are seeded as reference data; Student Village room codes use a two-digit village number (for example `SV04A1`). Accounts are created by an administrator (no open registration). Reopened tickets enter `ASSIGNED` for Call Center Staff to choose the unit and optional Technician/Contractor. The reopening window includes exactly day three.

@@ -1,7 +1,5 @@
 import re
 from pathlib import Path
-from html.parser import HTMLParser
-
 from html import unescape
 
 from django.test import SimpleTestCase
@@ -12,38 +10,6 @@ from .content.personas import PERSONAS
 from .content.prototype import PROTOTYPE
 from .content.scenarios import SCENARIOS
 from .content.study import STUDY
-
-
-class PendingBoxParser(HTMLParser):
-    VOID_ELEMENTS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
-
-    def __init__(self):
-        super().__init__()
-        self.elements = []
-        self.unboxed_pending_text = []
-
-    def handle_starttag(self, tag, attrs):
-        if tag in self.VOID_ELEMENTS:
-            return
-        attributes = dict(attrs)
-        classes = attributes.get("class", "").split()
-        parent_is_box = self.elements[-1][1] if self.elements else False
-        parent_is_noncontent = self.elements[-1][2] if self.elements else False
-        is_box = parent_is_box or "pending" in classes or "research-note" in classes
-        is_noncontent = parent_is_noncontent or tag in {"script", "style"}
-        self.elements.append((tag, is_box, is_noncontent))
-
-    def handle_endtag(self, tag):
-        for index in range(len(self.elements) - 1, -1, -1):
-            if self.elements[index][0] == tag:
-                del self.elements[index:]
-                break
-
-    def handle_data(self, data):
-        in_box = self.elements and self.elements[-1][1]
-        in_noncontent = self.elements and self.elements[-1][2]
-        if re.search(r"\bpending\b", data, re.IGNORECASE) and not in_box and not in_noncontent:
-            self.unboxed_pending_text.append(data.strip())
 
 
 class Ps4PublicPagesTests(SimpleTestCase):
@@ -97,7 +63,6 @@ class Ps4PublicPagesTests(SimpleTestCase):
             "evidence",
             "scenario_slugs",
             "interview_note",
-            "pending",
         }
         scenario_slugs = {scenario["slug"] for scenario in SCENARIOS}
 
@@ -152,8 +117,8 @@ class Ps4PublicPagesTests(SimpleTestCase):
     def test_feedback_gaps_are_shown_on_the_relevant_persona_pages(self):
         expected_gaps = {
             "resident": "The closure rule has changed",
-            "officer": "The officer queue cannot be searched by student ID or room",
-            "unit-worker": "Technicians cannot put a job on hold",
+            "officer": "The Call Center Staff queue cannot be searched by student ID or room",
+            "unit-worker": "Technician/Contractor users cannot put a job on hold",
         }
         for slug, gap_title in expected_gaps.items():
             with self.subTest(persona=slug):
@@ -252,7 +217,7 @@ class Ps4PublicPagesTests(SimpleTestCase):
         self.assertNotIn("routine", scenario_text)
         self.assertNotIn("to be confirmed", scenario_text)
         self.assertIn("same action", scenario_text)
-        self.assertIn("available technician", scenario_text)
+        self.assertIn("available technician/contractor", scenario_text)
         self.assertIn("r2", " ".join(scenario["steps"]).lower())
         self.assertIn("ofam-3", " ".join(scenario["steps"]).lower())
 
@@ -297,11 +262,11 @@ class Ps4PublicPagesTests(SimpleTestCase):
             / "Q2_personas_and_scenarios.md"
         )
         report = report_path.read_text().lower()
-        resident_narrative = report.split("### illustrative narrative", 1)[1].split("## desk officer", 1)[0]
+        resident_narrative = report.split("### illustrative narrative", 1)[1].split("## call center staff", 1)[0]
         self.assertNotIn("routine", resident_narrative)
         self.assertNotIn("to be confirmed", resident_narrative)
 
-    def test_pending_text_is_only_rendered_inside_a_box(self):
+    def test_research_pages_have_no_pending_placeholders_or_tags(self):
         urls = [
             *self.urls,
             *(f"/ps4/personas/{persona['slug']}/" for persona in PERSONAS),
@@ -310,9 +275,10 @@ class Ps4PublicPagesTests(SimpleTestCase):
         for url in urls:
             with self.subTest(url=url):
                 response = self.client.get(url)
-                parser = PendingBoxParser()
-                parser.feed(response.content.decode())
-                self.assertEqual(parser.unboxed_pending_text, [])
+                body = response.content.decode()
+                for placeholder in ("[PENDING:", "[Team to test:", "[Title and date"):
+                    self.assertNotIn(placeholder, body)
+                self.assertNotIn('class="pending"', body)
 
     def test_q2_report_is_evidence_linked_and_anonymized(self):
         report_path = (
@@ -323,7 +289,7 @@ class Ps4PublicPagesTests(SimpleTestCase):
         )
         self.assertTrue(report_path.is_file())
         report = report_path.read_text()
-        for heading in ("## Resident", "## Desk officer", "## Field technician"):
+        for heading in ("## Resident", "## Call Center Staff", "## Technician/Contractor"):
             self.assertIn(heading, report)
         self.assertEqual(report.count("This narrative is illustrative"), 3)
 
@@ -350,8 +316,8 @@ class Ps4PublicPagesTests(SimpleTestCase):
         )
         scope_note = (
             "Account R2 describes a gas-pipe fault that the resident experienced as serious. "
-            "OFAM confirmed that it recognised the seriousness of the fault, sent the available technician immediately, and that call center staff created and assigned the ticket at the same time (OFAM-3). "
-            "The project's current workflow already allows a call center officer to move a new ticket directly to assigned, so no new workflow state is needed. "
+            "OFAM confirmed that it recognised the seriousness of the fault, sent the available Technician/Contractor immediately, and that Call Center Staff created and assigned the ticket at the same time (OFAM-3). "
+            "The project's current workflow allows Call Center Staff to move a new ticket directly to ASSIGNED, so no new workflow state is needed. "
             "The design must support a same-day path, and the report records this as a change to the workflow description."
         )
         self.assertIn(scope_note, report)
@@ -411,12 +377,9 @@ class Ps4PublicPagesTests(SimpleTestCase):
         )
         self.assertContains(
             response,
-            "Call-center staff (S1), contractor (C1), and technician (T1) interviews took place in person on 11 November 2026 at OFAM Building, second floor, Room 210, starting at 14:00.",
+            "Call Center Staff (S1) and Technician/Contractor (C1, T1) interviews took place in person on 11 November 2026 at OFAM Building, second floor, Room 210, starting at 14:00.",
         )
-        self.assertContains(response, "Closure timing differs across the supplied accounts")
-        self.assertContains(response, "15-day response window (OFAM-1, OFAM-2)")
-        self.assertContains(response, "three days, then immediately (S1)")
-        self.assertContains(response, "three-day grace period for reopening (S1)")
+        self.assertContains(response, "The current workflow closes work on completion and allows reopening through day three.")
         self.assertNotContains(response, "[PENDING: disagreements")
 
     def test_prototype_page_shows_the_feedback_gaps_and_changes(self):
@@ -424,10 +387,10 @@ class Ps4PublicPagesTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Gaps in the app that the feedback exposed")
         for phrase in (
-            "Technicians cannot put a job on hold",
-            "The officer queue cannot be searched by student ID or room",
+            "Technician/Contractor users cannot put a job on hold",
+            "The Call Center Staff queue cannot be searched by student ID or room",
             "The closure rule has changed",
-            "The back end supports a hold, but no screen lets the technician record it.",
+            "The back end supports a hold, but no screen lets the Technician/Contractor record it.",
             "Add a ticket-number search as well",
             "3-day grace period",
             "Block comments once the ticket is closed.",
@@ -460,15 +423,38 @@ class Ps4PublicPagesTests(SimpleTestCase):
             "FIMS.",
             "The comparators are general-purpose service or public reporting platforms.",
             "The comparison supports building a residence-specific application only if the gaps found in interviews are real",
-            "Complete the bracketed trial results and access dates for each comparator",
-            "Title and date of the FIMS user guide, from OFAM.",
+            "Requester walkthroughs for Jira and MaintainX not completed.",
+            "The OFAM user guide was not available for review.",
+            "The public page asks for a work email",
+            "No account needed. The site's FAQ says you can report without registering",
+            "Accessed",
+            "Figure A1",
+            "Figure A6",
+            "Bad recaptcha",
+            "Sign Up for Free",
+            "What our system adds:",
         ):
             self.assertIn(phrase, body)
         self.assertEqual(len(ALTERNATIVES["comparators"]), 3)
-        for comparator in ALTERNATIVES["comparators"]:
-            self.assertIn(comparator["registration"], body)
-            self.assertIn(comparator["usability"], body)
-        self.assertIn(ALTERNATIVES["access_dates"], body)
+        self.assertIn(ALTERNATIVES["access_date_summary"], body)
+
+        def all_strings(value):
+            if isinstance(value, dict):
+                for nested_value in value.values():
+                    yield from all_strings(nested_value)
+            elif isinstance(value, list):
+                for nested_value in value:
+                    yield from all_strings(nested_value)
+            elif isinstance(value, str) and value:
+                yield value
+
+        for value in all_strings(ALTERNATIVES):
+            self.assertIn(value, body)
+
+        for screenshot in ALTERNATIVES["screenshots"]:
+            self.assertIn(f"/static/{screenshot['image']}", body)
+            image_path = Path(__file__).resolve().parent / "static" / screenshot["image"]
+            self.assertTrue(image_path.is_file())
 
     def test_prototype_page_shows_walkthrough_ratings_and_observations(self):
         response = self.client.get("/ps4/prototype/")
