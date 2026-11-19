@@ -180,6 +180,30 @@ class RequestPageNotesTests(TestCase):
                 self.assertContains(response, "Waiting for a replacement valve")
                 self.assertContains(response, expected.strftime("%b"))
 
+    def test_a_held_job_can_be_resumed_and_then_completed_from_the_pages(self):
+        self.start()
+        put_on_hold(
+            report_id=self.report.pk,
+            technician=self.technician,
+            expected_version=self.report.version,
+            reason="Waiting for parts",
+            expected_date=date.today() + timedelta(days=2),
+        )
+        self.report.refresh_from_db()
+        self.client.force_login(self.technician)
+        page = reverse("assignments:technician_report_detail", args=[self.report.pk])
+
+        held = self.client.get(page)
+        self.assertContains(held, "Resume work")
+
+        self.client.post(
+            reverse("assignments:start_work", args=[self.report.pk]),
+            {"version": self.report.version},
+        )
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "IN_PROGRESS")
+        self.assertContains(self.client.get(page), "Mark complete")
+
     def test_open_ticket_shows_no_completion_record(self):
         response = self.resident_page()
 

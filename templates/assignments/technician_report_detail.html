@@ -43,12 +43,12 @@
 
 {% report_notes report %}
 
-{% if report.status == "ASSIGNED" %}
+{% if report.status == "ASSIGNED" or report.status == "ON_HOLD" %}
     <section class="card">
         <form method="post" action="{% url 'assignments:start_work' report.id %}">
             {% csrf_token %}
             <input type="hidden" name="version" value="{{ version }}">
-            <button type="submit">Start work</button>
+            <button type="submit">{% if report.status == "ON_HOLD" %}Resume work{% else %}Start work{% endif %}</button>
         </form>
     </section>
 {% elif report.status == "IN_PROGRESS" %}
