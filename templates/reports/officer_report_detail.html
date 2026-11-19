@@ -32,6 +32,8 @@
     <p class="user-content">{{ report.description|linebreaksbr }}</p>
 </section>
 
+{% report_notes report %}
+
 {% if report.status == "SUBMITTED" %}
     <section class="card">
         <form method="post" action="{% url 'accounts:begin_report_review' report.id %}">

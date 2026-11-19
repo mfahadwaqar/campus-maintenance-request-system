@@ -8,6 +8,7 @@
     <p class="eyebrow">Call Center Staff</p>
     <h1>Maintenance request queue</h1>
     <p class="lede">Resident-submitted maintenance requests appear below.</p>
+    <p><a class="button-link" href="{% url 'accounts:officer_create_report' %}">Enter a request for a caller</a></p>
     {% queue_summary reports %}
     <form method="get" class="filter-form">
         {% for field in filter_form %}
@@ -46,7 +47,9 @@
                             </form>
                         {% elif report.status == "UNDER_REVIEW" or report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}
                             {% if report.active_assignments %}
-                                <p>Assigned to: {{ report.active_assignments.0.technician.get_full_name|default:report.active_assignments.0.technician.username }}</p>
+                                {% with assignment=report.active_assignments.0 %}
+                                <p>Assigned to: {{ assignment.unit.name }}{% if assignment.technician %} · {{ assignment.technician.get_full_name|default:assignment.technician.username }}{% endif %}</p>
+                                {% endwith %}
                             {% endif %}
                             <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">
                                 {% if report.status == "UNDER_REVIEW" %}Assign Technician/Contractor{% else %}Reassign Technician/Contractor{% endif %}

@@ -23,6 +23,7 @@
                     <a href="{% url 'reports:create' %}"{% if current == 'reports:create' %} aria-current="page"{% endif %}>New request</a>
                 {% elif user.role == "CALL_CENTER_STAFF" %}
                     <a href="{% url 'accounts:officer_dashboard' %}"{% if current == 'accounts:officer_dashboard' or current == 'accounts:officer_report_detail' %} aria-current="page"{% endif %}>Queue</a>
+                    <a href="{% url 'accounts:officer_create_report' %}"{% if current == 'accounts:officer_create_report' %} aria-current="page"{% endif %}>New ticket</a>
                     <a href="{% url 'accounts:unit_results' %}"{% if current == 'accounts:unit_results' %} aria-current="page"{% endif %}>Unit results</a>
                 {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
                     <a href="{% url 'accounts:technician_dashboard' %}"{% if current == 'accounts:technician_dashboard' or current == 'assignments:technician_report_detail' %} aria-current="page"{% endif %}>My work</a>

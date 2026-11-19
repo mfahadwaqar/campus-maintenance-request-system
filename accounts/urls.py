@@ -34,6 +34,7 @@ urlpatterns = [
         views.officer_reopen_report,
         name="officer_reopen_report",
     ),
+    path("officer/reports/new/", views.officer_create_report, name="officer_create_report"),
     path("dashboard/", views.dashboard_redirect, name="dashboard"),
     path(
         "resident/dashboard/",

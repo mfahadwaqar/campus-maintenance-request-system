@@ -327,3 +327,9 @@ textarea { height: 7rem; }
 .research-note { display: inline-block; margin: .5rem 0; padding: .5rem .75rem; border: 1px solid var(--terra); border-radius: 8px; background: var(--highlight); }
 .persona-navigation { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 2rem; }
 .prototype-screenshot { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+
+/* Hold notice and reopen window on request pages */
+.notice-hold { border-left: 4px solid var(--terra); background: var(--highlight); }
+.notice-hold h2 { margin-top: 0; }
+.reopen-window { margin: 1rem 0 0; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--teal-soft); }
+.reopen-window.expired { background: transparent; color: var(--muted); border: 1px dashed var(--line); }

@@ -118,7 +118,7 @@ PROTOTYPE = {
       'note': 'Every status change with time and actor.'},
      {'figure': 'Figure 9',
       'image': 'ps4/prototype/fig9.png',
-      'label': 'Reopened ticket in officer queue',
+      'label': 'Reopened ticket in Call Center Staff queue',
       'note': "The reopened request is highlighted and offers 'Reassign Technician/Contractor'."}],
     "session": {'concept_shown': 'Two printed workflow diagrams of the proposed process (one for Call Center '
                       'Staff, one for the Technician/Contractor), in English with a Thai translation. '
@@ -156,11 +156,11 @@ PROTOTYPE = {
       'text': 'Budget limits and manual KPIs sit outside the system, so the tool cannot fix them.',
       'type': 'Negative'}],
     "suggestions": [{'code': 'S1',
-      'implication': 'Add an unread marker and automatic refresh to the officer queue. Link replies to '
+      'implication': 'Add an unread marker and automatic refresh to the Call Center Staff queue. Link replies to '
                      'the ticket.',
       'suggestion': 'Make follow-ups visible to staff without opening each ticket.'},
      {'code': 'S1',
-      'implication': 'Add a search box to the officer queue (Figure 6).',
+      'implication': 'Add a search box to the Call Center Staff queue (Figure 6).',
       'suggestion': 'Let staff find a ticket by room, student ID or ticket number.'},
      {'code': 'S1, T1',
       'implication': 'Add a hold action with reason and expected date to the technician screen (Figure '

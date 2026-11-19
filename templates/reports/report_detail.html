@@ -28,13 +28,6 @@
     <h2>Description</h2>
     <p class="user-content">{{ report.description|linebreaksbr }}</p>
 
-    {% if master_summary %}
-        <div class="master-summary">
-            <h2>Related master request</h2>
-            <p>Request #{{ master_summary.id }} · {{ master_summary.status }}</p>
-        </div>
-    {% endif %}
-
     {% if report.photos.all %}
         <h2>Photos</h2>
         <ul class="photo-list">
@@ -44,6 +37,8 @@
         </ul>
     {% endif %}
 </section>
+
+{% report_notes report %}
 
 {% if verification_form %}
     <div class="grid-2">
@@ -81,7 +76,7 @@
 {% endif %}
 {% if reopen_form and not verification_form %}
     <section class="card">
-        <h2>Reopen related request</h2>
+        <h2>Reopen request</h2>
         <form method="post" action="{% url 'reports:reopen' report.id %}">
             {% csrf_token %}
             {{ reopen_form.version }}
@@ -89,7 +84,7 @@
                 {{ reopen_form.reason.label_tag }}
                 {{ reopen_form.reason }}
             </div>
-            <button type="submit" class="button-secondary">Reopen master request</button>
+            <button type="submit" class="button-secondary">Reopen request</button>
         </form>
     </section>
 {% endif %}

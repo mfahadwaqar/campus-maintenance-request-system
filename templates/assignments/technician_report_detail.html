@@ -41,6 +41,8 @@
     {% endif %}
 </section>
 
+{% report_notes report %}
+
 {% if report.status == "ASSIGNED" %}
     <section class="card">
         <form method="post" action="{% url 'assignments:start_work' report.id %}">
