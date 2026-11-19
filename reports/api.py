@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -52,14 +53,152 @@ from .services import (
 User = get_user_model()
 
 
+def _person(user):
+    if user is None:
+        return None
+    return {
+        "id": user.pk,
+        "name": user.name or user.get_full_name() or user.get_username(),
+    }
+
+
+def _assignment_payload(assignment):
+    return {
+        "id": assignment.pk,
+        "unit": {"id": assignment.unit_id, "name": assignment.unit.name},
+        "technician": _person(assignment.technician),
+        "assigned_at": assignment.assigned_at,
+        "started_at": assignment.started_at,
+        "completed_at": assignment.completed_at,
+        "is_active": assignment.is_active,
+        "end_reason": assignment.end_reason,
+    }
+
+
 class ReportSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     subcategory_name = serializers.CharField(source="subcategory.name", read_only=True)
     building_name = serializers.CharField(source="building.name", read_only=True)
     room_verified = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    resident = serializers.SerializerMethodField()
+    active_assignment = serializers.SerializerMethodField()
+    assignments = serializers.SerializerMethodField()
+    completion = serializers.SerializerMethodField()
+    hold = serializers.SerializerMethodField()
+    reopen = serializers.SerializerMethodField()
+    verification = serializers.SerializerMethodField()
+    photos = serializers.SerializerMethodField()
 
     def get_room_verified(self, report) -> bool:
         return report.location_verified_at is not None
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_resident(self, report):
+        resident = report.resident
+        return {
+            **_person(resident),
+            "student_id": resident.get_username(),
+            "email": resident.email,
+            "phone": resident.phone,
+        }
+
+    def _assignment_rows(self, report):
+        return sorted(
+            report.assignments.all(),
+            key=lambda row: (row.assigned_at, row.pk),
+            reverse=True,
+        )
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_active_assignment(self, report):
+        for row in self._assignment_rows(report):
+            if row.is_active:
+                return _assignment_payload(row)
+        return None
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_assignments(self, report):
+        return [_assignment_payload(row) for row in self._assignment_rows(report)]
+
+    def _completion_assignment(self, report):
+        done = [row for row in report.assignments.all() if row.completed_at]
+        return max(done, key=lambda row: (row.completed_at, row.pk), default=None)
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_completion(self, report):
+        row = self._completion_assignment(report)
+        if row is None:
+            return None
+        return {
+            "completed_at": row.completed_at,
+            "completion_notes": row.completion_notes,
+            "requester_signed_on_site": row.requester_signed_on_site,
+            "completed_without_resident": not row.requester_signed_on_site,
+        }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_hold(self, report):
+        if report.status != Report.Status.ON_HOLD:
+            return None
+        latest = (
+            report.status_history.filter(new_status=Report.Status.ON_HOLD)
+            .order_by("-changed_at", "-pk")
+            .first()
+        )
+        return {
+            "reason": latest.note if latest else "",
+            "expected_date": report.expected_date,
+        }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_reopen(self, report):
+        """Reopen window for a closed ticket. The front end still checks the role."""
+        if report.status != Report.Status.CLOSED:
+            return None
+        row = self._completion_assignment(report)
+        if row is None:
+            return None
+        days = getattr(settings, "REOPEN_WINDOW_DAYS", 3)
+        deadline = row.completed_at + timedelta(days=days)
+        remaining = (deadline - timezone.now()).total_seconds()
+        return {
+            "window_days": days,
+            "deadline": deadline,
+            "window_open": remaining >= 0,
+            "seconds_remaining": max(0, int(remaining)),
+        }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_verification(self, report):
+        rows = sorted(
+            report.verifications.all(),
+            key=lambda row: (row.created_at, row.pk),
+            reverse=True,
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return {
+            "outcome": row.outcome,
+            "rating": row.rating,
+            "comment": row.comment,
+            "created_at": row.created_at,
+        }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_photos(self, report):
+        return [
+            {
+                "id": photo.pk,
+                "stage": photo.stage,
+                "url": reverse(
+                    "api:report-photo",
+                    kwargs={"report_id": report.pk, "photo_id": photo.pk},
+                ),
+            }
+            for photo in sorted(report.photos.all(), key=lambda row: row.pk)
+        ]
 
     class Meta:
         model = Report
@@ -86,6 +225,15 @@ class ReportSerializer(serializers.ModelSerializer):
             "version",
             "created_at",
             "updated_at",
+            "status_label",
+            "resident",
+            "active_assignment",
+            "assignments",
+            "completion",
+            "hold",
+            "reopen",
+            "verification",
+            "photos",
         )
         read_only_fields = fields
 
@@ -356,6 +504,9 @@ class UnitSerializer(serializers.ModelSerializer):
 
 
 class UnitResultSerializer(serializers.Serializer):
+    unit = serializers.CharField(help_text="Unit name.")
+    jobs_completed = serializers.IntegerField()
+    average_hours = serializers.FloatField(allow_null=True)
     unit_id = serializers.IntegerField()
     unit_name = serializers.CharField()
     kind = serializers.ChoiceField(choices=UnitKind.choices)
@@ -384,10 +535,19 @@ class CategoryReferenceSerializer(serializers.ModelSerializer):
         ]
 
 
+REPORT_PREFETCH = (
+    "assignments__unit",
+    "assignments__technician",
+    "photos",
+    "verifications",
+)
+
+
 def _report_for_user(user, report_id):
     return get_object_or_404(
         Report.objects.for_user(user)
-        .select_related("category", "building")
+        .select_related("category", "building", "resident", "subcategory")
+        .prefetch_related(*REPORT_PREFETCH)
         .filter(pk=report_id)
     )
 
@@ -466,8 +626,10 @@ class ReportListCreateAPIView(APIView):
     )
     def get(self, request):
         """GET /api/reports/: role-scoped, paginated collection; requires a signed-in session."""
-        reports = Report.objects.for_user(request.user).select_related(
-            "category", "building"
+        reports = (
+            Report.objects.for_user(request.user)
+            .select_related("category", "building", "resident", "subcategory")
+            .prefetch_related(*REPORT_PREFETCH)
         )
         search_values = {
             key: request.query_params.get(key, "").strip()
@@ -1184,15 +1346,21 @@ class UnitResultsAPIView(APIView):
                     "started_at", "completed_at"
                 )
             ]
+            completed_jobs = assignments.count()
+            average_hours = (
+                round(sum(durations) / len(durations) / 3600, 2) if durations else None
+            )
             results.append({
+                # The two measures named in the API specification.
+                "unit": unit.name,
+                "jobs_completed": completed_jobs,
+                "average_hours": average_hours,
+                # Longer names kept for existing callers.
                 "unit_id": unit.pk,
                 "unit_name": unit.name,
                 "kind": unit.kind,
-                "completed_jobs": assignments.count(),
-                "average_completion_hours": (
-                    round(sum(durations) / len(durations) / 3600, 2)
-                    if durations else None
-                ),
+                "completed_jobs": completed_jobs,
+                "average_completion_hours": average_hours,
                 "period": period,
             })
         return Response(results)
