@@ -4,9 +4,15 @@
         const sub = document.getElementById("id_subcategory");
         if (!category || !sub) return;
         const all = Array.from(sub.options);
+        const placeholder = all.find(o => o.value === "");
         const show = () => {
             const keep = sub.value;
             const fits = all.filter(o => o.value === "" || o.dataset.category === category.value);
+            if (placeholder) {
+                if (!category.value) placeholder.textContent = "Choose a category first";
+                else if (fits.length === 1) placeholder.textContent = "No subcategories for this category (optional)";
+                else placeholder.textContent = "- Select an option -";
+            }
             sub.replaceChildren(...fits);
             sub.value = fits.some(o => o.value === keep) ? keep : "";
         };
