@@ -6,11 +6,17 @@
 <section class="panel">
     <p class="eyebrow">Resident</p>
     <h1>Your maintenance requests</h1>
-    <p>Submit a maintenance request or review updates to your existing requests.</p>
-    <p>
-        <a class="button-link" href="{% url 'reports:create' %}">Submit a request</a>
-        <a href="{% url 'reports:list' %}">View your requests</a>
-    </p>
+    <p class="lede">Submit a maintenance request or review updates to your existing requests.</p>
+    <div class="action-cards">
+        <a class="action-card primary" href="{% url 'reports:create' %}">
+            <strong>Submit a request</strong>
+            Report a problem in your room or building.
+        </a>
+        <a class="action-card" href="{% url 'reports:list' %}">
+            <strong>View your requests</strong>
+            Track progress, add comments, verify finished work.
+        </a>
+    </div>
     <aside class="notice">
         <h2>Urgent or safety-critical issue?</h2>
         <p>Contact the OFAM call center at [OFAM call-center telephone number: to be confirmed by OFAM].</p>

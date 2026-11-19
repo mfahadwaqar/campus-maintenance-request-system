@@ -4,10 +4,14 @@
 
 {% block content %}
 <section class="panel login-panel">
+    <a class="brand" href="{% url 'accounts:dashboard' %}">
+        <span class="brand-mark" aria-hidden="true">CM</span>
+        <span>Campus Maintenance</span>
+    </a>
     <h1>Log in</h1>
-    <p>Use the account provided by your campus administrator.</p>
+    <p class="lede">Use the account provided by your campus administrator.</p>
     {% if form.errors %}
-        <p class="error-message" role="alert">Your username or password was not recognized.</p>
+        <p class="alert alert-error" role="alert">Your username or password was not recognized.</p>
     {% endif %}
     <form method="post">
         {% csrf_token %}

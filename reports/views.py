@@ -125,7 +125,7 @@ def reopen_report_view(request, report_id):
                 reason=form.cleaned_data["reason"],
             )
             messages.success(
-                request, f"Request #{reopened.pk} was sent back for officer review."
+                request, f"Request #{reopened.pk} was reopened and sent to Call Center Staff for reassignment."
             )
         except (ValidationError, ReportConflict) as exc:
             messages.error(

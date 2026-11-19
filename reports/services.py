@@ -332,8 +332,9 @@ def _apply_transition(report, new_status, actor, actor_role, **kwargs):
     elif new_status == Report.Status.CLOSED:
         queue_report_notifications(
             locked,
-            event="was automatically closed after completion",
+            event="was automatically closed after completion. You can reopen it within the reopen window",
             recipients=(locked.resident,),
+            lead="Your repair is complete.",
         )
     return locked
 

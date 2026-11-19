@@ -1,17 +1,20 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Work order #{{ report.id }} | Campus Maintenance{% endblock %}
 
 {% block content %}
-<article class="panel">
-    {% for message in messages %}
-        <p class="status-message">{{ message }}</p>
-    {% endfor %}
+<div class="stack">
+<article class="card">
     <p class="eyebrow">Assigned work · Request #{{ report.id }}</p>
     <div class="page-heading">
-        <h1>{{ report.title }}</h1>
-        <span class="status">{{ report.get_status_display }}</span>
+        <div>
+            <h1>{{ report.title }}</h1>
+            <span class="ticket-tag">{{ report.ticket_no }}</span>
+        </div>
+        <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
     </div>
+    {% journey report.status %}
     <dl class="report-details">
         <dt>Category</dt><dd>{{ report.category }}</dd>
         <dt>Building</dt><dd>{{ report.building }}</dd>
@@ -23,62 +26,74 @@
             {% if report.resident.email %} · {{ report.resident.email }}{% endif %}
         </dd>
     </dl>
+</article>
+
+<section class="card">
     <h2>Repair details</h2>
     <p class="user-content">{{ report.description|linebreaksbr }}</p>
-
-    {% if report.status == "ASSIGNED" %}
-        <form method="post" action="{% url 'assignments:start_work' report.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="version" value="{{ version }}">
-            <button type="submit">Start work</button>
-        </form>
-    {% elif report.status == "IN_PROGRESS" %}
-        <section>
-            <h2>Complete work</h2>
-            <form method="post" enctype="multipart/form-data" action="{% url 'assignments:complete_work' report.id %}">
-                {% csrf_token %}
-                {{ completion_form.version }}
-                {% if completion_form.non_field_errors %}<div class="error-message" role="alert">{{ completion_form.non_field_errors }}</div>{% endif %}
-                {% for field in completion_form.visible_fields %}
-                    <div class="form-field">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
-                    </div>
-                {% endfor %}
-                <button type="submit">Mark complete</button>
-            </form>
-        </section>
-    {% endif %}
-
-    {% if hold_form %}
-        <section>
-            <h2>Put work on hold</h2>
-            <form method="post" action="{% url 'assignments:put_on_hold' report.id %}">
-                {% csrf_token %}
-                {{ hold_form.version }}
-                {% if hold_form.non_field_errors %}<div class="error-message" role="alert">{{ hold_form.non_field_errors }}</div>{% endif %}
-                {% for field in hold_form.visible_fields %}
-                    <div class="form-field">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
-                    </div>
-                {% endfor %}
-                <button type="submit">Notify resident and put on hold</button>
-            </form>
-        </section>
-    {% endif %}
-
     {% if report.photos.all %}
         <h2>Photos</h2>
-        <ul>
+        <ul class="photo-list">
             {% for photo in report.photos.all %}
                 <li><a href="{% url 'reports:photo_download' report.id photo.id %}">{{ photo.get_stage_display }} photo</a></li>
             {% endfor %}
         </ul>
     {% endif %}
-    <p><a href="{% url 'reports:history' report.id %}">View status history</a></p>
+</section>
+
+{% report_notes report %}
+
+{% if report.status == "ASSIGNED" or report.status == "ON_HOLD" %}
+    <section class="card">
+        <form method="post" action="{% url 'assignments:start_work' report.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="version" value="{{ version }}">
+            <button type="submit">{% if report.status == "ON_HOLD" %}Resume work{% else %}Start work{% endif %}</button>
+        </form>
+    </section>
+{% elif report.status == "IN_PROGRESS" %}
+    <section class="card">
+        <h2>Complete work</h2>
+        <form method="post" enctype="multipart/form-data" action="{% url 'assignments:complete_work' report.id %}">
+            {% csrf_token %}
+            {{ completion_form.version }}
+            {% if completion_form.non_field_errors %}<div class="error-message" role="alert">{{ completion_form.non_field_errors }}</div>{% endif %}
+            {% for field in completion_form.visible_fields %}
+                <div class="form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit">Mark complete</button>
+        </form>
+    </section>
+{% endif %}
+
+{% if hold_form %}
+    <section class="card">
+        <h2>Put work on hold</h2>
+        <p class="lede">Use this when the job is waiting, for example for spare parts. The resident is notified with the reason and the expected date.</p>
+        <form method="post" action="{% url 'assignments:put_on_hold' report.id %}">
+            {% csrf_token %}
+            {{ hold_form.version }}
+            {% if hold_form.non_field_errors %}<div class="error-message" role="alert">{{ hold_form.non_field_errors }}</div>{% endif %}
+            {% for field in hold_form.visible_fields %}
+                <div class="form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="button-secondary">Notify resident and put on hold</button>
+        </form>
+    </section>
+{% endif %}
+
+<section class="card">
     {% include "reports/_comments.html" %}
-</article>
+</section>
+
+<p><a href="{% url 'reports:history' report.id %}">View status history</a> · <a href="{% url 'accounts:technician_dashboard' %}">Back to my work</a></p>
+</div>
 {% endblock %}

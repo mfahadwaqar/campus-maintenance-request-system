@@ -13,6 +13,19 @@
 </section>
 {% endfor %}
 <section>
+  <h2>Current interface (updated UI, sample data)</h2>
+  <p>{{ prototype.intro }}</p>
+  {% for screen in prototype.current_screens %}
+  <section class="prototype-screen">
+    <h3>{{ screen.figure }}: {{ screen.label }}</h3>
+    <figure>
+      <img class="proto-shot" src="{% static screen.image %}" alt="{{ screen.figure }}: {{ screen.label }}, current interface" loading="lazy">
+      <figcaption>{{ screen.note }}</figcaption>
+    </figure>
+  </section>
+  {% endfor %}
+</section>
+<section>
   <h2>Gaps in the app that the feedback exposed</h2>
   <table>
     <thead><tr><th>Gap</th><th>What the feedback showed</th><th>What the app does now</th><th>Change</th></tr></thead>
@@ -53,4 +66,43 @@
     </tbody>
   </table>
 </section>
+<section>
+  <h2>Concept review session</h2>
+  <dl class="report-details">
+    <dt>Date</dt><dd>{{ prototype.session.date }}</dd>
+    <dt>Mode</dt><dd>{{ prototype.session.mode }}</dd>
+    <dt>Duration</dt><dd>{{ prototype.session.duration }}</dd>
+    <dt>Concept shown</dt><dd>{{ prototype.session.concept_shown }}</dd>
+    <dt>Task prompt</dt><dd>{{ prototype.session.task_prompt }}</dd>
+    <dt>Participants</dt>
+    <dd>{% for p in prototype.participants %}{{ p.code }} ({{ p.user_class }}){% if not forloop.last %}, {% endif %}{% endfor %}</dd>
+  </dl>
+</section>
+<section>
+  <h2>Feedback by participant</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Code</th><th>Type</th><th>Feedback</th></tr></thead>
+    <tbody>
+    {% for f in prototype.feedback %}
+      <tr><td>{{ f.code }}</td><td>{{ f.type }}</td><td>{{ f.text }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+<section>
+  <h2>Suggestions and what they imply</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Code</th><th>Suggestion or concern</th><th>Design implication</th></tr></thead>
+    <tbody>
+    {% for s in prototype.suggestions %}
+      <tr><td>{{ s.code }}</td><td>{{ s.suggestion }}</td><td>{{ s.implication }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+<p class="research-note">{{ prototype.limitations }}</p>
 {% endblock %}

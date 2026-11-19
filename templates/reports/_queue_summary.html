@@ -1,0 +1,9 @@
+<div class="summary-tiles" aria-label="Requests on this page by stage">
+    {% for tile in tiles %}
+        <div class="summary-tile" style="--c: {{ tile.color }}">
+            <strong>{{ tile.count }}</strong>
+            <span>{{ tile.label }}</span>
+        </div>
+    {% endfor %}
+</div>
+<p class="summary-note">Counts cover the requests on this page.</p>

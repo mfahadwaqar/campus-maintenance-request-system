@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, redirect_to_login
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
 from django.http import HttpResponseBadRequest
 from django.http import Http404
@@ -22,12 +23,14 @@ from assignments.forms import (
     SetPriorityForm,
 )
 from assignments.models import Assignment
-from reports.forms import CommentForm
+from reports.forms import CallerReportForm, CommentForm
 from reports.forms import ReopenReportForm
 from reports.models import Comment, Report
 from accounts.models import Unit
 from reports.services import (
     ReportConflict,
+    assign_technician,
+    enter_report_for_caller,
     reject_report,
     reopen_report,
     set_priority,
@@ -351,3 +354,54 @@ def technician_dashboard(request):
     return render(
         request, "accounts/technician_dashboard.html", {"reports": reports}
     )
+
+
+@role_required(User.Role.CALL_CENTER_STAFF)
+def officer_create_report(request):
+    """Enter a request received by phone, email or walk-in, optionally assigning it at once."""
+
+    form = CallerReportForm(
+        request.POST if request.method == "POST" else None,
+        request.FILES if request.method == "POST" else None,
+    )
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        try:
+            with transaction.atomic():
+                report = enter_report_for_caller(
+                    resident=data["resident"],
+                    submitted_by=request.user,
+                    channel=data["channel"],
+                    category=data["category"],
+                    subcategory=data.get("subcategory"),
+                    building=data["building"],
+                    room_location=data["room_location"],
+                    title=data["title"],
+                    description=data["description"],
+                    requested_urgency=data["requested_urgency"],
+                    room_verified=data["room_verified"],
+                    photo=data.get("photo"),
+                )
+                if data.get("unit"):
+                    report = assign_technician(
+                        report_id=report.pk,
+                        technician=data.get("technician"),
+                        assigned_by=request.user,
+                        priority=data.get("priority") or None,
+                        expected_version=report.version,
+                        unit=data["unit"],
+                    )
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        except (IntegrityError, ReportConflict):
+            form.add_error(None, "The request could not be saved. Check the details and try again.")
+        else:
+            if data.get("unit"):
+                messages.success(
+                    request,
+                    f"Ticket {report.ticket_no} was created and assigned to {data['unit'].name}.",
+                )
+            else:
+                messages.success(request, f"Ticket {report.ticket_no} was created.")
+            return redirect("accounts:officer_report_detail", report_id=report.pk)
+    return render(request, "accounts/officer_create_report.html", {"form": form})

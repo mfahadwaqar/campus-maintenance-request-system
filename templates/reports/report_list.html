@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Maintenance requests | Campus Maintenance{% endblock %}
 
@@ -16,20 +17,22 @@
     {% if reports %}
         <div class="report-list">
             {% for report in reports %}
-                <article class="report-row">
+                <article class="report-row status-{{ report.status|lower }}">
                     <div>
                         <h2><a href="{% url 'reports:detail' report.id %}">{{ report.title }}</a></h2>
-                        <p>{{ report.category }} · {{ report.building }} · {{ report.created_at|date:"M j, Y" }}</p>
+                        <p><span class="ticket-tag">{{ report.ticket_no }}</span> {{ report.category }} · {{ report.building }} · {{ report.created_at|date:"M j, Y" }} {% if report.status|is_open %}<span class="age-tag">Open {{ report.created_at|timesince }}</span>{% endif %}</p>
                     </div>
-                    <span class="status">{{ report.get_status_display }}</span>
+                    <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
                 </article>
             {% endfor %}
         </div>
     {% else %}
-        <p>No maintenance requests to display.</p>
-        {% if user.role == "RESIDENT" %}
-            <p><a href="{% url 'reports:create' %}">Submit your first request</a>.</p>
-        {% endif %}
+        <div class="empty-state">
+            <p>No maintenance requests to display.</p>
+            {% if user.role == "RESIDENT" %}
+                <p><a href="{% url 'reports:create' %}">Submit your first request</a>.</p>
+            {% endif %}
+        </div>
     {% endif %}
 </section>
 {% endblock %}

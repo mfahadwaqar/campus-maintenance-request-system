@@ -9,17 +9,17 @@
     {% if reports %}
         <div class="report-list">
             {% for report in reports %}
-                <article class="report-row">
+                <article class="report-row status-{{ report.status|lower }}">
                     <div>
                         <h2><a href="{% url 'assignments:technician_report_detail' report.id %}">{{ report.title }}</a></h2>
-                        <p>Request #{{ report.id }} · {{ report.category }} · {{ report.building }}</p>
+                        <p><span class="ticket-tag">{{ report.ticket_no }}</span> Request #{{ report.id }} · {{ report.category }} · {{ report.building }}</p>
                     </div>
-                    <span class="status">{{ report.get_status_display }}</span>
+                    <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
                 </article>
             {% endfor %}
         </div>
     {% else %}
-        <p>You have no active maintenance assignments.</p>
+        <p class="empty-state">You have no active maintenance assignments.</p>
     {% endif %}
 </section>
 {% endblock %}

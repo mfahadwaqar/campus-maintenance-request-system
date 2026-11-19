@@ -1,17 +1,20 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Request #{{ report.id }} | Campus Maintenance{% endblock %}
 
 {% block content %}
-<article class="panel">
-    {% for message in messages %}
-        <p class="status-message">{{ message }}</p>
-    {% endfor %}
+<div class="stack">
+<article class="card">
     <p class="eyebrow">Request #{{ report.id }}</p>
     <div class="page-heading">
-        <h1>{{ report.title }}</h1>
-        <span class="status">{{ report.get_status_display }}</span>
+        <div>
+            <h1>{{ report.title }}</h1>
+            <span class="ticket-tag">{{ report.ticket_no }}</span>
+        </div>
+        <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
     </div>
+    {% journey report.status %}
     <dl class="report-details">
         <dt>Category</dt><dd>{{ report.category }}</dd>
         <dt>Building</dt><dd>{{ report.building }}</dd>
@@ -19,27 +22,27 @@
         <dt>Requested urgency</dt><dd>{{ report.get_requested_urgency_display }}</dd>
         <dt>Submitted</dt><dd>{{ report.created_at|date:"M j, Y, P" }}</dd>
     </dl>
+</article>
+
+<section class="card">
     <h2>Description</h2>
     <p class="user-content">{{ report.description|linebreaksbr }}</p>
 
-    {% if master_summary %}
-        <section class="master-summary">
-            <h2>Related master request</h2>
-            <p>Request #{{ master_summary.id }} · {{ master_summary.status }}</p>
-        </section>
-    {% endif %}
-
     {% if report.photos.all %}
         <h2>Photos</h2>
-        <ul>
+        <ul class="photo-list">
             {% for photo in report.photos.all %}
                 <li><a href="{% url 'reports:photo_download' report.id photo.id %}">{{ photo.get_stage_display }} photo</a></li>
             {% endfor %}
         </ul>
     {% endif %}
+</section>
 
-    {% if verification_form %}
-        <section>
+{% report_notes report %}
+
+{% if verification_form %}
+    <div class="grid-2">
+        <section class="card">
             <h2>Verify completed work</h2>
             <form method="post" action="{% url 'reports:verify' report.id %}">
                 {% csrf_token %}
@@ -56,7 +59,7 @@
             </form>
         </section>
         {% if reopen_form %}
-        <section>
+        <section class="card">
             <h2>Reopen request</h2>
             <form method="post" action="{% url 'reports:reopen' report.id %}">
                 {% csrf_token %}
@@ -65,28 +68,34 @@
                     {{ reopen_form.reason.label_tag }}
                     {{ reopen_form.reason }}
                 </div>
-                <button type="submit">Reopen request</button>
+                <button type="submit" class="button-secondary">Reopen request</button>
             </form>
         </section>
         {% endif %}
-    {% endif %}
-    {% if reopen_form and not verification_form %}
-        <section>
-            <h2>Reopen related request</h2>
-            <form method="post" action="{% url 'reports:reopen' report.id %}">
-                {% csrf_token %}
-                {{ reopen_form.version }}
-                <div class="form-field">
-                    {{ reopen_form.reason.label_tag }}
-                    {{ reopen_form.reason }}
-                </div>
-                <button type="submit">Reopen master request</button>
-            </form>
-        </section>
-    {% endif %}
+    </div>
+{% endif %}
+{% if reopen_form and not verification_form %}
+    <section class="card">
+        <h2>Reopen request</h2>
+        <form method="post" action="{% url 'reports:reopen' report.id %}">
+            {% csrf_token %}
+            {{ reopen_form.version }}
+            <div class="form-field">
+                {{ reopen_form.reason.label_tag }}
+                {{ reopen_form.reason }}
+            </div>
+            <button type="submit" class="button-secondary">Reopen request</button>
+        </form>
+    </section>
+{% endif %}
 
-    <p><a href="{% url 'reports:history' report.id %}">View full status history</a></p>
+<section class="card">
     {% include "reports/_comments.html" %}
-    <p><a href="{% url 'reports:list' %}">Back to requests</a></p>
-</article>
+</section>
+
+<p>
+    <a href="{% url 'reports:history' report.id %}">View full status history</a> ·
+    <a href="{% url 'reports:list' %}">Back to requests</a>
+</p>
+</div>
 {% endblock %}

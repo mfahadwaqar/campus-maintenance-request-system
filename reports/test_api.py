@@ -43,6 +43,12 @@ def image_upload(name="api-photo.jpg"):
     return SimpleUploadedFile(name, output.getvalue(), content_type="image/jpeg")
 
 
+def release_streamed_file(response):
+    """Close a streamed photo so Windows can delete it; response.close() would also close the test database."""
+    for closer in getattr(response, "_resource_closers", ()):
+        closer()
+
+
 class ReportApiTests(APITestCase):
     def setUp(self):
         self.building = Building.objects.create(name="Dormitory A", zone="Zone 1")
@@ -885,6 +891,7 @@ class ReportApiTests(APITestCase):
                 self.client.force_authenticate(user)
                 response = self.client.get(photo_url)
                 self.assertEqual(response.status_code, expected)
+                release_streamed_file(response)
 
         report.refresh_from_db()
         start_work(
@@ -922,6 +929,7 @@ class ReportApiTests(APITestCase):
                 self.client.force_authenticate(user)
                 response = self.client.get(completion_url)
                 self.assertEqual(response.status_code, expected)
+                release_streamed_file(response)
 
     def test_item_9_since_returns_only_newer_ids_in_ascending_order(self):
         report = self.create_report()

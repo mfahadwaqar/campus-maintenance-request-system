@@ -2,10 +2,21 @@ from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-from accounts.models import Building
+from accounts.models import Building, Unit, User
 from accounts.room_validation import validate_room_location
 from .models import Category, Report, Subcategory
 from .photo_pipeline import validate_and_reencode_photo
+
+
+class CategoryAwareSelect(forms.Select):
+    """A subcategory dropdown whose options carry their category, so the page can filter them."""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        instance = getattr(value, "instance", None)
+        if instance is not None:
+            option["attrs"]["data-category"] = str(instance.category_id)
+        return option
 
 
 class ReportSubmissionForm(forms.ModelForm):
@@ -23,6 +34,7 @@ class ReportSubmissionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["subcategory"].widget = CategoryAwareSelect()
         self.fields["category"].queryset = Category.objects.filter(is_active=True)
         self.fields["building"].queryset = Building.objects.filter(is_active=True)
         self.fields["subcategory"].queryset = Subcategory.objects.filter(is_active=True)
@@ -65,6 +77,86 @@ class ReportSubmissionForm(forms.ModelForm):
         if uploaded_file is None:
             return None
         return validate_and_reencode_photo(uploaded_file)
+
+
+class CallerReportForm(ReportSubmissionForm):
+    """Call Center Staff enter a request for a caller, optionally assigning it at once."""
+
+    resident = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        label="Caller (resident account)",
+        help_text="Choose the resident the caller is reporting for.",
+    )
+    channel = forms.ChoiceField(
+        choices=(("PHONE", "Phone call"), ("EMAIL", "Email"), ("WALK_IN", "Walk-in")),
+        label="How the request arrived",
+    )
+    room_verified = forms.BooleanField(
+        required=True,
+        label="I verified the building and room with the caller",
+    )
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.none(),
+        required=False,
+        label="Assign now to a unit (serious faults)",
+        help_text="Leave empty to review and assign later.",
+    )
+    technician = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        required=False,
+        label="Technician/Contractor (optional)",
+    )
+    priority = forms.ChoiceField(
+        choices=(("", "---------"),) + tuple(settings.PRIORITY_CHOICES),
+        required=False,
+        label="Priority (required when assigning now)",
+    )
+
+    field_order = (
+        "resident",
+        "channel",
+        "category",
+        "subcategory",
+        "building",
+        "room_location",
+        "room_verified",
+        "title",
+        "description",
+        "requested_urgency",
+        "photo",
+        "unit",
+        "technician",
+        "priority",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["resident"].queryset = User.objects.filter(
+            role=User.Role.RESIDENT, is_active=True
+        ).order_by("username")
+        self.fields["resident"].label_from_instance = lambda user: (
+            f"{user.name or user.get_full_name() or user.username} ({user.username})"
+        )
+        self.fields["unit"].queryset = Unit.objects.filter(is_active=True)
+        self.fields["technician"].queryset = User.objects.filter(
+            role=User.Role.TECHNICIAN_CONTRACTOR, is_active=True
+        ).select_related("unit")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        unit = cleaned_data.get("unit")
+        technician = cleaned_data.get("technician")
+        if technician and unit is None:
+            unit = technician.unit
+            cleaned_data["unit"] = unit
+        if technician and unit is not None and technician.unit_id != unit.pk:
+            self.add_error(
+                "technician",
+                "The Technician/Contractor must belong to the selected unit.",
+            )
+        if unit is not None and not cleaned_data.get("priority"):
+            self.add_error("priority", "Choose a priority when assigning now.")
+        return cleaned_data
 
 
 class VerificationForm(forms.Form):

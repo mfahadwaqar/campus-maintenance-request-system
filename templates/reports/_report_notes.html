@@ -1,0 +1,31 @@
+{% if hold %}
+<section class="card notice notice-hold">
+    <h2>Work is on hold</h2>
+    <p class="user-content">{{ hold.reason }}</p>
+    <p><strong>Expected date:</strong> {{ hold.expected_date|date:"M j, Y" }}</p>
+</section>
+{% endif %}
+{% if completion %}
+<section class="card">
+    <h2>Completion record</h2>
+    <dl class="report-details">
+        <dt>Completed</dt><dd>{{ completion.completed_at|date:"M j, Y, P" }}</dd>
+        <dt>Notes</dt><dd class="user-content">{{ completion.completion_notes|linebreaksbr }}</dd>
+        <dt>Resident signature</dt>
+        <dd>
+            {% if completion.requester_signed_on_site %}
+                Signed on site
+            {% else %}
+                <span class="status status-reopened">Completed without the resident present</span>
+            {% endif %}
+        </dd>
+    </dl>
+    {% if reopen %}
+        {% if reopen.is_open %}
+            <p class="reopen-window"><strong>Reopen window open:</strong> {{ reopen.deadline|timeuntil }} left (until {{ reopen.deadline|date:"M j, Y, P" }}).</p>
+        {% else %}
+            <p class="reopen-window expired">The {{ reopen.days }}-day reopen window closed on {{ reopen.deadline|date:"M j, Y, P" }}.</p>
+        {% endif %}
+    {% endif %}
+</section>
+{% endif %}

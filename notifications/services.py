@@ -10,7 +10,7 @@ from .models import Notification
 logger = logging.getLogger(__name__)
 
 
-def queue_report_notifications(report, *, event: str, recipients) -> None:
+def queue_report_notifications(report, *, event: str, recipients, lead: str = "") -> None:
     """Persist privacy-limited notifications and send their emails after commit."""
 
     notification_ids = []
@@ -20,7 +20,11 @@ def queue_report_notifications(report, *, event: str, recipients) -> None:
         notification = Notification.objects.create(
             user=user,
             report=report,
-            message=f"{report.ticket_no}: {event}.",
+            message=(
+                f"{lead} {report.ticket_no} {event}."
+                if lead
+                else f"{report.ticket_no}: {event}."
+            ),
             channel=Notification.Channel.EMAIL,
         )
         notification_ids.append(notification.pk)

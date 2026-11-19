@@ -6,7 +6,7 @@
 <section class="panel form-panel">
     <p class="eyebrow">Resident</p>
     <h1>Submit a maintenance request</h1>
-    <p>Provide the location and a clear description. A photo is optional.</p>
+    <p class="lede">Provide the location and a clear description. A photo is optional.</p>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% if form.non_field_errors %}<div class="error-message" role="alert">{{ form.non_field_errors }}</div>{% endif %}
@@ -18,7 +18,11 @@
                 {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
             </div>
         {% endfor %}
-        <button type="submit">Submit request</button>
+        <div class="form-actions">
+            <button type="submit">Submit request</button>
+            <a href="{% url 'reports:list' %}">Cancel</a>
+        </div>
     </form>
 </section>
+{% include "reports/_subcategory_filter.html" %}
 {% endblock %}

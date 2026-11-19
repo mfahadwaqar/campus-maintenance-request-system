@@ -1,17 +1,20 @@
 {% extends "base.html" %}
+{% load ui %}
 
 {% block title %}Call Center Staff review · Request #{{ report.id }}{% endblock %}
 
 {% block content %}
-<article class="panel">
+<div class="stack">
+<article class="card">
     <p class="eyebrow">Call Center Staff · Request #{{ report.id }}</p>
     <div class="page-heading">
-        <h1>{{ report.title }}</h1>
-        <span class="status">{{ report.get_status_display }}</span>
+        <div>
+            <h1>{{ report.title }}</h1>
+            <span class="ticket-tag">{{ report.ticket_no }}</span>
+        </div>
+        <span class="status status-{{ report.status|lower }}">{{ report.get_status_display }}</span>
     </div>
-    {% for message in messages %}
-        <p class="status-message">{{ message }}</p>
-    {% endfor %}
+    {% journey report.status %}
 
     <dl class="report-details">
         <dt>Resident</dt><dd>{{ report.resident.get_full_name|default:report.resident.username }} · {{ report.resident.email }} · {{ report.resident.phone }}</dd>
@@ -22,10 +25,17 @@
         <dt>Priority</dt><dd>{{ report.get_priority_display|default:"Not set" }}</dd>
         <dt>Submitted</dt><dd>{{ report.created_at|date:"M j, Y, P" }}</dd>
     </dl>
+</article>
+
+<section class="card">
     <h2>Description</h2>
     <p class="user-content">{{ report.description|linebreaksbr }}</p>
+</section>
 
-    {% if report.status == "SUBMITTED" %}
+{% report_notes report %}
+
+{% if report.status == "SUBMITTED" %}
+    <section class="card">
         <form method="post" action="{% url 'accounts:begin_report_review' report.id %}">
             {% csrf_token %}
             {{ review_form.version }}
@@ -36,33 +46,41 @@
             </div>
             <button type="submit">Begin review</button>
         </form>
-    {% elif report.status == "UNDER_REVIEW" %}
-        <section>
+    </section>
+{% elif report.status == "UNDER_REVIEW" %}
+    <div class="grid-2">
+        <section class="card">
             <h2>Set priority</h2>
             <form method="post" action="{% url 'accounts:update_report_priority' report.id %}">
                 {% csrf_token %}
                 {{ priority_form.version }}
-                {{ priority_form.priority.label_tag }}
-                {{ priority_form.priority }}
+                <div class="form-field">
+                    {{ priority_form.priority.label_tag }}
+                    {{ priority_form.priority }}
+                </div>
                 <button type="submit">Save priority</button>
             </form>
         </section>
-        <section>
+        <section class="card">
             <h2>Assign Technician/Contractor</h2>
-            <p>Select a Technician/Contractor and set the priority together on the assignment form.</p>
-            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose Technician/Contractor</a>
+            <p>Select a unit, an optional Technician/Contractor, and the priority on the assignment form.</p>
+            <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Choose unit and technician</a>
         </section>
-        <section>
+        <section class="card">
             <h2>Reject request</h2>
             <form method="post" action="{% url 'accounts:reject_report' report.id %}">
                 {% csrf_token %}
                 {{ reject_form.version }}
-                {{ reject_form.reason.label_tag }}
-                {{ reject_form.reason }}
-                <button type="submit">Reject request</button>
+                <div class="form-field">
+                    {{ reject_form.reason.label_tag }}
+                    {{ reject_form.reason }}
+                </div>
+                <button type="submit" class="button-danger">Reject request</button>
             </form>
         </section>
-    {% elif report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}
+    </div>
+{% elif report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}
+    <section class="card">
         <h2>Assignment history</h2>
         <ul>
             {% for assignment in report.assignments.all %}
@@ -76,22 +94,31 @@
             {% endfor %}
         </ul>
         <a class="button-link" href="{% url 'assignments:assign_report' report.id %}">Reassign Technician/Contractor</a>
-    {% elif report.status == "CLOSED" and reopen_form %}
-        <section>
-            <h2>Reopen ticket within three days</h2>
-            <form method="post" action="{% url 'accounts:officer_reopen_report' report.id %}">
-                {% csrf_token %}
-                {{ reopen_form.version }}
+    </section>
+{% elif report.status == "CLOSED" and reopen_form %}
+    <section class="card">
+        <h2>Reopen ticket within three days</h2>
+        <p class="lede">The resident or Call Center Staff can reopen a closed ticket for three days after completion. It returns to Assigned for reassignment.</p>
+        <form method="post" action="{% url 'accounts:officer_reopen_report' report.id %}">
+            {% csrf_token %}
+            {{ reopen_form.version }}
+            <div class="form-field">
                 {{ reopen_form.reason.label_tag }}
                 {{ reopen_form.reason }}
                 {% if reopen_form.reason.errors %}<div class="error-message" role="alert">{{ reopen_form.reason.errors }}</div>{% endif %}
-                <button type="submit">Reopen for reassignment</button>
-            </form>
-        </section>
-    {% endif %}
+            </div>
+            <button type="submit">Reopen for reassignment</button>
+        </form>
+    </section>
+{% endif %}
 
-    <p><a href="{% url 'reports:history' report.id %}">View full status history</a></p>
+<section class="card">
     {% include "reports/_comments.html" %}
-    <p><a href="{% url 'accounts:officer_dashboard' %}">Back to Call Center Staff queue</a></p>
-</article>
+</section>
+
+<p>
+    <a href="{% url 'reports:history' report.id %}">View full status history</a> ·
+    <a href="{% url 'accounts:officer_dashboard' %}">Back to Call Center Staff queue</a>
+</p>
+</div>
 {% endblock %}

@@ -90,6 +90,7 @@ class Command(BaseCommand):
         sample_buildings = list(Building.objects.exclude(name__startswith="Demo").order_by("name")[:2])
         residents = [user for user in users if user.role == User.Role.RESIDENT]
         officers = [user for user in users if user.role == User.Role.CALL_CENTER_STAFF]
+        technicians = [user for user in users if user.role == User.Role.TECHNICIAN_CONTRACTOR]
         for index, (title, description, priority) in enumerate(sample_reports, start=1):
             if Report.objects.filter(title=title).exists():
                 continue
@@ -110,11 +111,13 @@ class Command(BaseCommand):
                     room_verified=True,
                 )
             if index >= 4:
+                technician = technicians[index % len(technicians)]
                 report = assign_technician(
                     report_id=report.pk,
-                    technician=technicians[index % len(technicians)],
+                    technician=technician,
+                    unit=technician.unit,
                     assigned_by=officers[0],
-                    priority=None,
+                    priority=priority,
                     expected_version=report.version,
                 )
             if index >= 5:
