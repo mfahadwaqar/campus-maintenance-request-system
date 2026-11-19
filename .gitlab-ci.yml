@@ -1,39 +1,69 @@
 image: python:3.14-slim
 
+stages:
+  - static
+  - test
+  - e2e
+
 services:
   - name: postgres:17-alpine
     alias: postgres
 
 variables:
-  DJANGO_SETTINGS_MODULE: campus_maintainance_request_system.settings.prod
+  DJANGO_SETTINGS_MODULE: campus_maintainance_request_system.settings.dev
   DJANGO_SECRET_KEY: ci-only-not-a-production-secret
   DJANGO_ALLOWED_HOSTS: localhost
-  DJANGO_SECURE_SSL_REDIRECT: "false"
-  DJANGO_HSTS_SECONDS: "0"
+  DB_ENGINE: postgres
   POSTGRES_DB: campus_maintenance
   POSTGRES_USER: campus
   POSTGRES_PASSWORD: ci-test-password
   POSTGRES_HOST: postgres
   POSTGRES_PORT: "5432"
+  PRIVATE_MEDIA_ROOT: "$CI_PROJECT_DIR/.private_uploads"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
 cache:
   paths:
     - .cache/pip
 
-test:
-  stage: test
+.install: &install
   before_script:
     - python -m pip install --upgrade pip
-    - python -m pip install -r requirements.txt
-    - >-
-      until python -c 'import os, psycopg;
-      psycopg.connect(host=os.environ["POSTGRES_HOST"],
-      dbname=os.environ["POSTGRES_DB"], user=os.environ["POSTGRES_USER"],
-      password=os.environ["POSTGRES_PASSWORD"], port=os.environ["POSTGRES_PORT"])';
-      do sleep 1; done
+    - python -m pip install -r requirements.txt -r requirements-dev.txt
+
+# Static checks that do not run the application (lecture 6.2).
+static:
+  stage: static
+  <<: *install
+  script:
+    - python manage.py check
+    - python manage.py makemigrations --check --dry-run
+    - bandit -r accounts reports assignments notifications campus_maintainance_request_system -x "*/tests*,*/test_*,*/migrations/*" -q
+    - pip-audit -r requirements.txt
+    - radon cc accounts reports assignments notifications -a -s -n C --exclude "*/migrations/*,*/tests*,*/test_*" || true
+    - ruff check . --statistics
+  allow_failure: true   # report findings without blocking; tighten once the backlog is cleared
+
+# Unit, integration, security, performance, reliability, BDD and regression tests, with coverage.
+test:
+  stage: test
+  <<: *install
   script:
     - python manage.py migrate --noinput
-    - coverage run --source=accounts,reports,assignments,notifications,campus_maintainance_request_system manage.py test
-    - coverage report
-  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+    - pytest -m "not e2e" --cov=accounts --cov=reports --cov=assignments --cov=notifications --cov-branch --cov-report=term --cov-report=xml
+  coverage: '/TOTAL\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)%/'
+  artifacts:
+    when: always
+    paths:
+      - coverage.xml
+
+# Real-browser journeys (Playwright + live_server). Slower, so a separate job.
+e2e:
+  stage: e2e
+  variables:
+    E2E_BROWSER_CHANNEL: ""
+  <<: *install
+  script:
+    - python -m playwright install --with-deps chromium
+    - pytest tests/e2e -m e2e
+  allow_failure: true   # browser installs on shared runners can fail for reasons unrelated to the code

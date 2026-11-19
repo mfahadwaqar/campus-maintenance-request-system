@@ -112,13 +112,21 @@ Email is printed in the terminal while running locally. Nothing is sent.
 ## Run the tests
 
 ```bash
-python manage.py test
+pip install -r requirements-dev.txt          # test and code-quality tools
+pytest -q                                    # all tests (about 440, roughly 10 minutes)
+pytest -m "not e2e"                          # without the browser tests
+pytest -m unit                               # one type; also: integration, security, performance,
+                                             #   reliability, regression, bdd, e2e
+python manage.py test                        # the Django runner still works for the older tests
 ```
 
 PostgreSQL must be running, and the database user needs permission to create a test database
-(the `postgres` user does). The suite has about 200 tests and takes around five minutes.
+(the `postgres` user does). The browser tests drive Microsoft Edge if it is installed. Otherwise run
+`python -m playwright install chromium` and set `E2E_BROWSER_CHANNEL=` (empty).
 
-A step-by-step manual check of every feature is in [TESTING.md](TESTING.md).
+How the tests were designed, which lecture technique each one uses, the static-analysis results and
+the defects found are in [docs/TEST_DESIGN.md](docs/TEST_DESIGN.md). A short manual checklist is in
+[TESTING.md](TESTING.md).
 
 ## REST API in short
 
