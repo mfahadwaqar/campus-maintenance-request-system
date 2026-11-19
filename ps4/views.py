@@ -4,12 +4,12 @@ from django.shortcuts import render
 from .content.alternatives import ALTERNATIVES
 from .content.findings import FINDINGS
 from .content.mvp import MVP_DECISIONS, VALID_DECISIONS
-from .content.personas import PERSONAS
 from .content.permissions import PERMISSIONS
+from .content.personas import PERSONAS
 from .content.prototype import PROTOTYPE
 from .content.scenarios import SCENARIOS
-from .content.summary import SUMMARY
 from .content.study import STUDY
+from .content.summary import SUMMARY
 
 
 def index(request):

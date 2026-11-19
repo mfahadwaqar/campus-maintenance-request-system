@@ -11,6 +11,7 @@ from django.utils import timezone
 from PIL import Image
 
 from accounts.models import Building, RoomLocation, Unit, UnitKind, User
+
 from .models import Category, Comment, Photo, Report, StatusHistory
 from .services import add_comment, apply_transition
 

@@ -1,17 +1,18 @@
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
 from django.utils import timezone
-from assignments.models import Assignment
+from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from assignments.models import Assignment
+
 from .forms import (
     CommentForm,
     ReopenReportForm,

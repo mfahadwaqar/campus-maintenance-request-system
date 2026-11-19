@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 
 from accounts.models import Building, Unit, User
 from accounts.room_validation import validate_room_location
+
 from .models import Category, Report, Subcategory
 from .photo_pipeline import validate_and_reencode_photo
 

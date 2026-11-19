@@ -1,5 +1,5 @@
-from rest_framework.authentication import SessionAuthentication
 from drf_spectacular.extensions import OpenApiAuthenticationExtension
+from rest_framework.authentication import SessionAuthentication
 
 
 class ApiSessionAuthentication(SessionAuthentication):

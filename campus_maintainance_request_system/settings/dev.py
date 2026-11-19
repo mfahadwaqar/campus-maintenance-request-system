@@ -14,7 +14,7 @@ if ENV_FILE.is_file():
             value = value[1:-1]
         os.environ.setdefault(name.strip(), value)
 
-from .base import *  # noqa: F403
+from .base import *
 
 DEBUG = True
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "local-development-only-key")
@@ -22,9 +22,9 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 if os.environ.get("DB_ENGINE", "sqlite").lower() == "sqlite":
-    DATABASES = {  # noqa: F405
+    DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",  # noqa: F405
+            "NAME": BASE_DIR / "db.sqlite3",
         }
     }

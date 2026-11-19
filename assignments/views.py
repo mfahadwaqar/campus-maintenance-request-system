@@ -6,8 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.models import User
-from reports.forms import CompletionForm, HoldForm
-from reports.forms import CommentForm
+from reports.forms import CommentForm, CompletionForm, HoldForm
 from reports.models import Comment, Report
 from reports.services import (
     ReportConflict,
@@ -16,6 +15,7 @@ from reports.services import (
     put_on_hold,
     start_work,
 )
+
 from .forms import AssignTechnicianForm
 
 

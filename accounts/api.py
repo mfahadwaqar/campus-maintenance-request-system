@@ -17,7 +17,13 @@ from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.csrf import csrf_failure as default_csrf_failure
 from django.views.decorators.csrf import ensure_csrf_cookie
-from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_field,
+    inline_serializer,
+)
 from rest_framework import serializers
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -135,6 +141,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     def get_role_label(self, user) -> str:
         return user.get_role_display() if user.role else ""
 
+    @extend_schema_field(OpenApiTypes.OBJECT)
     def get_unit(self, user):
         if not user.unit_id:
             return None

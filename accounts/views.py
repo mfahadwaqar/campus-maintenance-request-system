@@ -1,5 +1,5 @@
-from functools import wraps
 from datetime import timedelta
+from functools import wraps
 
 from django.conf import settings
 from django.contrib import messages
@@ -9,13 +9,13 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
-from django.http import HttpResponseBadRequest
-from django.http import Http404
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from accounts.models import Unit
 from assignments.forms import (
     CallCenterQueueFilterForm,
     RejectReportForm,
@@ -23,10 +23,8 @@ from assignments.forms import (
     SetPriorityForm,
 )
 from assignments.models import Assignment
-from reports.forms import CallerReportForm, CommentForm
-from reports.forms import ReopenReportForm
+from reports.forms import CallerReportForm, CommentForm, ReopenReportForm
 from reports.models import Comment, Report
-from accounts.models import Unit
 from reports.services import (
     ReportConflict,
     assign_technician,
@@ -36,6 +34,7 @@ from reports.services import (
     set_priority,
     start_review,
 )
+
 from .models import User
 
 
@@ -100,7 +99,7 @@ def officer_dashboard(request):
         Prefetch(
             "assignments",
             queryset=Assignment.objects.filter(is_active=True).select_related(
-                "technician"
+                "technician", "unit"
             ),
             to_attr="active_assignments",
         )
@@ -125,6 +124,10 @@ def officer_dashboard(request):
                 comments__author__role=User.Role.RESIDENT,
                 awaiting_call_center_response=True,
             ).distinct()
+    elif filter_form.is_bound:
+        # A search the form cannot read (for example a ticket number that is too long)
+        # must not quietly list every ticket; show no results and the form's error.
+        reports = reports.none()
 
     page = Paginator(reports, 25).get_page(request.GET.get("page"))
     query_params = request.GET.copy()

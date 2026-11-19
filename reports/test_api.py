@@ -2,12 +2,11 @@ from datetime import timedelta
 from io import BytesIO
 from unittest.mock import patch
 
-from PIL import Image
-
-from django.test import Client
 from django.core.files.uploadedfile import SimpleUploadedFile
-from rest_framework.test import APITestCase
+from django.test import Client
 from django.utils import timezone
+from PIL import Image
+from rest_framework.test import APITestCase
 
 from accounts.models import (
     Building,
@@ -18,6 +17,7 @@ from accounts.models import (
 )
 from assignments.models import Assignment
 from notifications.models import Notification
+
 from .models import (
     Category,
     Comment,
@@ -27,9 +27,9 @@ from .models import (
     Verification,
 )
 from .services import (
+    apply_transition,
     assign_technician,
     complete_work,
-    apply_transition,
     start_review,
     start_work,
     submit_report,

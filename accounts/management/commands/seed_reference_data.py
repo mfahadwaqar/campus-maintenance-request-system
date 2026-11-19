@@ -4,7 +4,6 @@ from django.db import transaction
 from accounts.models import Building
 from reports.models import Category, Subcategory
 
-
 LOCATIONS = [
     "AI Center",
     "Admin",

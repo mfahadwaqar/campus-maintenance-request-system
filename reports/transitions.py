@@ -1,6 +1,5 @@
 from .models import AllowedTransition
 
-
 ALLOWED_TRANSITIONS = [
     ("SUBMITTED", "UNDER_REVIEW", "CALL_CENTER_STAFF"),
     ("SUBMITTED", "ASSIGNED", "CALL_CENTER_STAFF"),

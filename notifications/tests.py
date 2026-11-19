@@ -2,9 +2,9 @@ from django.core import mail
 from django.test import TestCase, override_settings
 
 from accounts.models import Building, User
+from notifications.models import Notification
 from reports.models import Category
 from reports.services import submit_report
-from notifications.models import Notification
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")

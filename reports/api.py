@@ -1,15 +1,14 @@
+from datetime import timedelta
 from pathlib import Path
 
-from datetime import timedelta
-
 from django.conf import settings
-from django.http import FileResponse
-from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from django.utils import timezone
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -27,13 +26,14 @@ from accounts.models import Building, RoomLocation, Unit, UnitKind
 from accounts.room_validation import validate_room_location
 from assignments.models import Assignment
 from notifications.models import Notification
+
 from .models import (
     Category,
     Comment,
     Photo,
     Report,
-    Subcategory,
     StatusHistory,
+    Subcategory,
 )
 from .services import (
     ReportConflict,

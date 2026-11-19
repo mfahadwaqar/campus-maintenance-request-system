@@ -3,7 +3,6 @@ from django.db import transaction
 
 from accounts.models import RoomLocation
 
-
 DORMITORIES = {
     "Zone 1": (4, ["A", "B", "C", "D", "F", "G", "H"]),
     "Zone 2": (3, ["E", "J", "K"]),
