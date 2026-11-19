@@ -19,7 +19,7 @@ variables:
   POSTGRES_PASSWORD: ci-test-password
   POSTGRES_HOST: postgres
   POSTGRES_PORT: "5432"
-  PRIVATE_MEDIA_ROOT: "$CI_PROJECT_DIR/.private_uploads"
+  PRIVATE_MEDIA_ROOT: "/tmp/private_uploads"   # must be outside the project folder (security rule)
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
 cache:
