@@ -35,7 +35,7 @@
         <h2>Photos</h2>
         <ul class="photo-list">
             {% for photo in report.photos.all %}
-                <li><a href="{% url 'reports:photo_download' report.id photo.id %}">{{ photo.get_stage_display }} photo</a></li>
+                <li class="photo-item"><a href="{% url 'reports:photo_download' report.id photo.id %}" target="_blank" rel="noopener"><img class="photo-thumb" src="{% url 'reports:photo_download' report.id photo.id %}" alt="{{ photo.get_stage_display }} photo" loading="lazy"><span>{{ photo.get_stage_display }} photo</span></a> <a class="photo-save" href="{% url 'reports:photo_download' report.id photo.id %}?download=1">Save</a></li>
             {% endfor %}
         </ul>
     {% endif %}

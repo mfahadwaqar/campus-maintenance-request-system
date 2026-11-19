@@ -205,7 +205,8 @@ def photo_download(request, report_id, photo_id):
     content_type = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
     return FileResponse(
         photo.file.open("rb"),
-        as_attachment=True,
+        # Shown inline so <img> tags on the work-order pages display it; ?download=1 saves it.
+        as_attachment=request.GET.get("download") == "1",
         filename=filename,
         content_type=content_type,
     )

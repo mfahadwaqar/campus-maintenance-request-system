@@ -313,3 +313,7 @@ textarea { height: 7rem; }
 .form-field:has(input[type="checkbox"]) label { grid-column: 2; grid-row: 1; }
 .form-field:has(input[type="checkbox"]) small,
 .form-field:has(input[type="checkbox"]) .error-message { grid-column: 1 / -1; }
+
+.photo-list .photo-item { display: flex; flex-direction: column; gap: 0.3rem; max-width: 220px; }
+.photo-thumb { display: block; max-width: 220px; max-height: 180px; border-radius: 8px; border: 1.5px solid var(--line); object-fit: cover; }
+.photo-save { font-size: 0.85rem; }

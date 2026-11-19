@@ -175,3 +175,33 @@ def test_R12_no_page_uses_retired_wording(client, resident, staff, technician, c
         body = client.get(url).content.decode()
         for word in STALE_WORDS:
             assert word not in body, f"{word!r} on {url}"
+
+
+def test_R13_a_technician_sees_the_residents_photo_on_the_work_order_page(client, new_report, flow, technician):
+    """Found 20 Nov 2026 in manual testing: the photo was only a text link that downloaded as a file."""
+    from reports.models import Photo
+    from reports.storage import private_photo_storage
+    from tests.conftest import jpeg_upload
+
+    report = new_report(photo=jpeg_upload())
+    flow.assign(report)
+    photo = Photo.objects.get(report=report)
+    client.force_login(technician)
+    url = reverse("reports:photo_download", args=[report.pk, photo.pk])
+
+    page = client.get(reverse("assignments:technician_report_detail", args=[report.pk])).content.decode()
+    response = client.get(url)
+    disposition = response["Content-Disposition"]
+    content_type = response["Content-Type"]
+    for closer in response._resource_closers:  # release the file on Windows
+        closer()
+    saved = client.get(url + "?download=1")
+    saved_disposition = saved["Content-Disposition"]
+    for closer in saved._resource_closers:
+        closer()
+    private_photo_storage.delete(photo.file_path)
+
+    assert f'<img class="photo-thumb" src="{url}"' in page
+    assert (response.status_code, content_type) == (200, "image/jpeg")
+    assert disposition.startswith("inline")
+    assert saved_disposition.startswith("attachment")
