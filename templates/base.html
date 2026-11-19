@@ -17,10 +17,16 @@
                     <a href="{% url 'reports:list' %}">Requests</a>
                 {% elif user.role == "CALL_CENTER_STAFF" %}
                     <a href="{% url 'accounts:officer_dashboard' %}">Dashboard</a>
+                    <a href="{% url 'accounts:unit_kpis' %}">Unit results</a>
                 {% elif user.role == "TECHNICIAN_CONTRACTOR" %}
                     <a href="{% url 'accounts:technician_dashboard' %}">Dashboard</a>
+                    <a href="{% url 'accounts:unit_kpis' %}">Unit results</a>
                 {% endif %}
                 {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administration</a>{% endif %}
+                <details>
+                    <summary><span id="notification-updated" data-url="{% url 'api:notification-list' %}" aria-live="polite">Checking notifications…</span></summary>
+                    <ul id="notification-list"></ul>
+                </details>
                 <span class="user-label">{{ user.get_full_name|default:user.username }}</span>
                 <form class="inline-form" action="{% url 'accounts:logout' %}" method="post">
                     {% csrf_token %}
@@ -34,5 +40,55 @@
     <main class="page-content">
         {% block content %}{% endblock %}
     </main>
+    {% if user.is_authenticated %}
+    <script>
+        (() => {
+            const marker = document.getElementById("notification-updated");
+            const list = document.getElementById("notification-list");
+            if (!marker || !list) return;
+            let cursor = 0;
+            let firstRequest = true;
+            let timer;
+            let controller;
+            let closed = false;
+            const poll = async () => {
+                controller = new AbortController();
+                try {
+                    const url = new URL(marker.dataset.url, window.location.href);
+                    if (!firstRequest) url.searchParams.set("since", String(cursor));
+                    const response = await fetch(url, {
+                        credentials: "same-origin",
+                        headers: {Accept: "application/json"},
+                        signal: controller.signal,
+                    });
+                    if (!response.ok) throw new Error("Notification update failed.");
+                    const payload = await response.json();
+                    const items = payload.results || [];
+                    for (const item of items) {
+                        cursor = Math.max(cursor, item.id);
+                        const entry = document.createElement("li");
+                        entry.textContent = item.message;
+                        list.prepend(entry);
+                    }
+                    while (list.children.length > 10) list.lastElementChild.remove();
+                    firstRequest = false;
+                    marker.textContent = items.length
+                        ? `${items.length} notification update(s) · ${new Date().toLocaleTimeString()}`
+                        : `Notifications checked at ${new Date().toLocaleTimeString()}`;
+                } catch (error) {
+                    if (error.name !== "AbortError") marker.textContent = "Notification updates unavailable; retrying.";
+                } finally {
+                    if (!closed) timer = window.setTimeout(poll, 10000);
+                }
+            };
+            window.addEventListener("pagehide", () => {
+                closed = true;
+                window.clearTimeout(timer);
+                controller?.abort();
+            }, {once: true});
+            poll();
+        })();
+    </script>
+    {% endif %}
 </body>
 </html>

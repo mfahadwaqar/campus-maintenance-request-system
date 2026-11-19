@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from accounts.models import Building, Unit, UnitKind, User
+from accounts.models import Building, RoomLocation, Unit, UnitKind, User
 from .models import Category, Comment, Photo, Report, StatusHistory
 from .services import add_comment, apply_transition
 
@@ -35,7 +35,14 @@ def image_upload(
 
 class ReportSubmissionTests(TestCase):
     def setUp(self):
-        self.building = Building.objects.create(name="Test Building", zone="Test Zone")
+        self.building = Building.objects.create(name="Dormitory A", zone="Zone 1")
+        RoomLocation.objects.get_or_create(
+            code="A204",
+            defaults={
+                "name": "Dormitory A",
+                "location_type": RoomLocation.LocationType.DORMITORY,
+            },
+        )
         self.category = Category.objects.create(name="Test Plumbing")
         self.resident = User.objects.create_user(
             username="resident", password="test-password", role=User.Role.RESIDENT
@@ -59,6 +66,7 @@ class ReportSubmissionTests(TestCase):
             "category": str(self.category.pk),
             "building": str(self.building.pk),
             "room_location": "A204",
+            "room_verified": "on",
             "title": "Leaking sink",
             "description": "Water is dripping under the sink.",
             "requested_urgency": "MEDIUM",
@@ -323,7 +331,7 @@ class TechnicianReportAccessTests(TestCase):
             Comment.objects.for_user(self.other_technician, self.report).exists()
         )
 
-    def test_active_assignment_unit_can_access_report_and_comments(self):
+    def test_same_unit_nonassignee_cannot_access_report_or_comments(self):
         self.client.force_login(self.unit_colleague)
 
         detail_response = self.client.get(
@@ -333,15 +341,19 @@ class TechnicianReportAccessTests(TestCase):
             reverse("reports:comments", args=(self.report.pk,))
         )
 
+        self.assertEqual(detail_response.status_code, 404)
+        self.assertEqual(comments_response.status_code, 404)
+        self.assertFalse(Comment.objects.for_user(self.unit_colleague, self.report).exists())
+
+    def test_named_active_assignee_can_access_report_and_comments(self):
+        self.client.force_login(self.assigned_technician)
+
+        detail_response = self.client.get(
+            reverse("reports:detail", args=(self.report.pk,))
+        )
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, self.report.title)
         self.assertContains(detail_response, self.comment.body)
-        self.assertEqual(comments_response.status_code, 200)
-        self.assertTrue(
-            Comment.objects.for_user(self.unit_colleague, self.report).filter(
-                pk=self.comment.pk
-            ).exists()
-        )
 
     def test_ended_assignment_does_not_grant_technician_access(self):
         assignment = self.report.assignments.get(is_active=True)
@@ -394,21 +406,17 @@ class CommentRulesTests(TestCase):
                 (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
                 (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
                 (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
-                (Report.Status.CLOSED, User.Role.RESIDENT),
+                (Report.Status.CLOSED, "SYSTEM"),
             ]
-        elif status == Report.Status.COMPLETED:
-            transitions = [
-                (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
-                (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
-                (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
-                (status, User.Role.TECHNICIAN_CONTRACTOR),
-            ]
+        elif status == Report.Status.ASSIGNED:
+            transitions = [(status, User.Role.CALL_CENTER_STAFF)]
         elif status == Report.Status.REOPENED:
             transitions = [
                 (Report.Status.UNDER_REVIEW, User.Role.CALL_CENTER_STAFF),
                 (Report.Status.ASSIGNED, User.Role.CALL_CENTER_STAFF),
                 (Report.Status.IN_PROGRESS, User.Role.TECHNICIAN_CONTRACTOR),
                 (Report.Status.COMPLETED, User.Role.TECHNICIAN_CONTRACTOR),
+                (Report.Status.CLOSED, "SYSTEM"),
                 (Report.Status.REOPENED, User.Role.RESIDENT),
             ]
         else:
@@ -429,7 +437,7 @@ class CommentRulesTests(TestCase):
         return report
 
     def test_completed_and_reopened_comments_succeed_and_resident_sets_flag(self):
-        for status in (Report.Status.COMPLETED, Report.Status.REOPENED):
+        for status in (Report.Status.ASSIGNED, Report.Status.REOPENED):
             with self.subTest(status=status):
                 report = self.make_report(status)
                 comment = add_comment(
@@ -440,7 +448,7 @@ class CommentRulesTests(TestCase):
                 self.assertTrue(report.awaiting_call_center_response)
 
     def test_staff_reply_clears_resident_flag(self):
-        report = self.make_report(Report.Status.COMPLETED)
+        report = self.make_report(Report.Status.ASSIGNED)
         add_comment(report_id=report.pk, author=self.resident, body="Resident update")
         add_comment(report_id=report.pk, author=self.staff, body="Staff update")
         report.refresh_from_db()
@@ -461,7 +469,7 @@ class CommentRulesTests(TestCase):
         self.assertEqual(Comment.objects.filter(report=report).count(), count)
 
     def test_comment_form_has_no_kind_field(self):
-        report = self.make_report(Report.Status.COMPLETED)
+        report = self.make_report(Report.Status.ASSIGNED)
         self.client.force_login(self.resident)
         response = self.client.get(reverse("reports:detail", args=(report.pk,)))
         self.assertEqual(response.status_code, 200)

@@ -103,7 +103,12 @@ class Command(BaseCommand):
                 requested_urgency=priority,
             )
             if index >= 2:
-                report = start_review(report_id=report.pk, actor=officers[0], expected_version=report.version)
+                report = start_review(
+                    report_id=report.pk,
+                    actor=officers[0],
+                    expected_version=report.version,
+                    room_verified=True,
+                )
             if index >= 4:
                 report = assign_technician(
                     report_id=report.pk,

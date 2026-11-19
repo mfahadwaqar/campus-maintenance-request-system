@@ -6,13 +6,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.models import User
-from reports.forms import CompletionForm
+from reports.forms import CompletionForm, HoldForm
 from reports.forms import CommentForm
 from reports.models import Comment, Report
 from reports.services import (
     ReportConflict,
     assign_technician,
     complete_work,
+    put_on_hold,
     start_work,
 )
 from .forms import AssignTechnicianForm
@@ -49,6 +50,7 @@ def assign_report(request, report_id):
                 assigned_by=request.user,
                 priority=form.cleaned_data["priority"],
                 expected_version=form.cleaned_data["version"],
+                unit=form.cleaned_data["unit"],
             )
         except ReportConflict as exc:
             response = render(
@@ -81,7 +83,7 @@ def _assigned_report_or_404(user, report_id):
     )
 
 
-def _technician_detail_context(user, report, completion_form=None):
+def _technician_detail_context(user, report, completion_form=None, hold_form=None):
     return {
         "report": report,
         "completion_form": completion_form
@@ -93,6 +95,12 @@ def _technician_detail_context(user, report, completion_form=None):
         "version": report.version,
         "comments": Comment.objects.for_user(user, report).select_related("author"),
         "comment_form": CommentForm(),
+        "hold_form": hold_form
+        or (
+            HoldForm(report=report)
+            if report.status in {Report.Status.ASSIGNED, Report.Status.IN_PROGRESS}
+            else None
+        ),
     }
 
 
@@ -167,5 +175,43 @@ def complete_work_view(request, report_id):
             request,
             "assignments/technician_report_detail.html",
             _technician_detail_context(request.user, report, form),
+        )
+    return redirect("accounts:technician_dashboard")
+
+
+@login_required
+@require_POST
+def put_on_hold_view(request, report_id):
+    report = _assigned_report_or_404(request.user, report_id)
+    form = HoldForm(request.POST, report=report)
+    if not form.is_valid():
+        return render(
+            request,
+            "assignments/technician_report_detail.html",
+            _technician_detail_context(request.user, report, hold_form=form),
+        )
+    try:
+        put_on_hold(
+            report_id=report.pk,
+            technician=request.user,
+            expected_version=form.cleaned_data["version"],
+            reason=form.cleaned_data["reason"],
+            expected_date=form.cleaned_data["expected_date"],
+        )
+        messages.success(request, "Work put on hold; the resident was notified.")
+    except ReportConflict as exc:
+        messages.error(request, str(exc))
+        return render(
+            request,
+            "assignments/technician_report_detail.html",
+            _technician_detail_context(request.user, report, hold_form=form),
+            status=409,
+        )
+    except ValidationError as exc:
+        form.add_error(None, exc)
+        return render(
+            request,
+            "assignments/technician_report_detail.html",
+            _technician_detail_context(request.user, report, hold_form=form),
         )
     return redirect("accounts:technician_dashboard")

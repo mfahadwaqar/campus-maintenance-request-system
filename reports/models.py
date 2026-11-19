@@ -69,13 +69,10 @@ class ReportManager(models.Manager):
         if getattr(user, "role", None) == "TECHNICIAN_CONTRACTOR":
             if not getattr(user, "pk", None):
                 return self.none()
-            assignment_scope = Q(assignments__technician_id=user.pk)
-            if user.unit_id is not None:
-                assignment_scope |= Q(assignments__unit_id=user.unit_id)
             return (
                 self.get_queryset()
                 .filter(assignments__is_active=True)
-                .filter(assignment_scope)
+                .filter(assignments__technician_id=user.pk)
                 .distinct()
             )
         return self.none()

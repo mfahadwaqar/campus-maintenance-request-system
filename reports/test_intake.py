@@ -45,6 +45,7 @@ class IntakeUATTests(TestCase):
             "title": "Leaking tap",
             "description": "Water is leaking from the tap.",
             "requested_urgency": "MEDIUM",
+            "room_verified": True,
         }
 
     def test_uat_01_resident_submission_generates_ticket(self):
@@ -71,7 +72,12 @@ class IntakeUATTests(TestCase):
 
     def test_uat_03_rejection_records_reason_and_alerts_resident(self):
         report = submit_report(resident=self.resident, **self.create_values())
-        start_review(report_id=report.pk, actor=self.officer, expected_version=report.version)
+        start_review(
+            report_id=report.pk,
+            actor=self.officer,
+            expected_version=report.version,
+            room_verified=True,
+        )
         report.refresh_from_db()
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -97,7 +103,12 @@ class IntakeReviewTests(TestCase):
         self.report = submit_report(resident=self.resident, category=category, building=building, room_location="A", title="Leak", description="Leak", requested_urgency="LOW")
 
     def test_officer_review_sets_location_verification(self):
-        reviewed = start_review(report_id=self.report.pk, actor=self.officer, expected_version=self.report.version)
+        reviewed = start_review(
+            report_id=self.report.pk,
+            actor=self.officer,
+            expected_version=self.report.version,
+            room_verified=True,
+        )
         reviewed.refresh_from_db()
         self.assertEqual(reviewed.status, Report.Status.UNDER_REVIEW)
         self.assertEqual(reviewed.location_verified_by, self.officer)
@@ -121,7 +132,12 @@ class ExecutionUATTests(TestCase):
             description="Leak",
             requested_urgency="MEDIUM",
         )
-        start_review(report_id=self.report.pk, actor=self.officer, expected_version=self.report.version)
+        start_review(
+            report_id=self.report.pk,
+            actor=self.officer,
+            expected_version=self.report.version,
+            room_verified=True,
+        )
         self.report.refresh_from_db()
         from reports.services import assign_technician
         assign_technician(
@@ -145,7 +161,12 @@ class ExecutionUATTests(TestCase):
         held.refresh_from_db()
         self.assertEqual(held.status, Report.Status.ON_HOLD)
         self.assertEqual(held.expected_date, date.today() + timedelta(days=2))
-        self.assertTrue(Comment.objects.filter(report=held, body="Waiting for a replacement valve.").exists())
+        self.assertTrue(
+            Comment.objects.filter(
+                report=held,
+                body__contains="Waiting for a replacement valve.\nExpected date:",
+            ).exists()
+        )
         self.assertTrue(Notification.objects.filter(report=held, user=self.resident, message__contains="hold").exists())
 
     def test_uat_08_completion_records_notes_photo_and_verification_start(self):
@@ -168,7 +189,7 @@ class ExecutionUATTests(TestCase):
         )
         completed.refresh_from_db()
         assignment.refresh_from_db()
-        self.assertEqual(completed.status, Report.Status.COMPLETED)
+        self.assertEqual(completed.status, Report.Status.CLOSED)
         self.assertIsNotNone(assignment.completed_at)
         self.assertTrue(assignment.requester_signed_on_site)
         self.assertEqual(assignment.completion_notes, "Replaced valve and tested operation.")
@@ -193,7 +214,12 @@ class CommentUATTests(TestCase):
             description="Comment test",
             requested_urgency="MEDIUM",
         )
-        start_review(report_id=report.pk, actor=officer, expected_version=report.version)
+        start_review(
+            report_id=report.pk,
+            actor=officer,
+            expected_version=report.version,
+            room_verified=True,
+        )
         report.refresh_from_db()
         from reports.services import assign_technician
         assign_technician(

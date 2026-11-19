@@ -40,6 +40,7 @@
                             <form method="post" action="{% url 'accounts:begin_report_review' report.id %}">
                                 {% csrf_token %}
                                 <input type="hidden" name="version" value="{{ report.version }}">
+                                <label><input type="checkbox" name="room_verified" value="on" required> Confirm room and building</label>
                                 <button type="submit">Begin review</button>
                             </form>
                         {% elif report.status == "UNDER_REVIEW" or report.status == "ASSIGNED" or report.status == "IN_PROGRESS" or report.status == "REOPENED" %}

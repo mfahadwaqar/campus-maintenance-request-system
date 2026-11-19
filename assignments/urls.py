@@ -21,4 +21,9 @@ urlpatterns = [
         views.complete_work_view,
         name="complete_work",
     ),
+    path(
+        "technician/reports/<int:report_id>/hold/",
+        views.put_on_hold_view,
+        name="put_on_hold",
+    ),
 ]

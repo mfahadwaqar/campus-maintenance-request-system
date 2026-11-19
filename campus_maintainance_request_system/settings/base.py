@@ -12,7 +12,7 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
-REPAIR_CLOSE_DAYS = 15
+REOPEN_WINDOW_DAYS = 3
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -21,6 +21,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
+    "drf_spectacular",
     "accounts.apps.AccountsConfig",
     "reports.apps.ReportsConfig",
     "assignments.apps.AssignmentsConfig",
@@ -91,6 +93,28 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "reports.api_authentication.ApiSessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Campus Maintenance Request API",
+    "DESCRIPTION": "Session-authenticated API for maintenance reports and workflow.",
+    "VERSION": "1.0.0",
+    "SERVERS": [
+        {"url": "http://192.41.170.180", "description": "CSIM deployed API"},
+        {"url": "http://localhost:8000", "description": "Local development"},
+    ],
+}
+
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
@@ -126,7 +150,5 @@ PRIORITY_CHOICES = (
     ("HIGH", "High"),
     ("URGENT", "Urgent"),
 )
-AUTO_CLOSE_COMPLETED_DAYS = int(os.environ.get("AUTO_CLOSE_COMPLETED_DAYS", "30"))
-REOPEN_AFTER_CLOSED_DAYS = int(os.environ.get("REOPEN_AFTER_CLOSED_DAYS", "60"))
 TICKET_PREFIX = os.environ.get("TICKET_PREFIX", "MR")
 SYSTEM_USER_EMAIL = os.environ.get("SYSTEM_USER_EMAIL", "system@campus.local")

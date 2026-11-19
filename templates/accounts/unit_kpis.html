@@ -1,11 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Unit KPIs | Campus Maintenance{% endblock %}
+{% block title %}Unit results | Campus Maintenance{% endblock %}
 
 {% block content %}
 <section class="panel">
   <p class="eyebrow">Performance</p>
   <h1>Unit results</h1>
+  <form method="get" class="filter-form">
+    <label for="period">Period</label>
+    <select id="period" name="period">
+      <option value="month"{% if period == "month" %} selected{% endif %}>Last 30 days</option>
+      <option value="quarter"{% if period == "quarter" %} selected{% endif %}>Last 90 days</option>
+      <option value="year"{% if period == "year" %} selected{% endif %}>Last 365 days</option>
+      <option value="all"{% if period == "all" %} selected{% endif %}>All time</option>
+    </select>
+    <button type="submit">Update results</button>
+  </form>
   <table>
     <thead>
       <tr><th>Unit</th><th>Jobs completed</th><th>Average completion time</th></tr>
@@ -15,7 +25,7 @@
       <tr>
         <td>{{ row.unit.name }}</td>
         <td>{{ row.completed_jobs }}</td>
-        <td>{{ row.average_hours }} hours</td>
+        <td>{% if row.average_hours != None %}{{ row.average_hours }} hours{% else %}Not available{% endif %}</td>
       </tr>
       {% empty %}
       <tr><td colspan="3">No units available.</td></tr>

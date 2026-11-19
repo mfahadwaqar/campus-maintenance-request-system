@@ -9,6 +9,8 @@ from accounts.models import User
 def _validate_assignment(unit, technician, officer):
     if unit is None:
         raise ValidationError("A unit is required.")
+    if not unit.is_active:
+        raise ValidationError("Choose an active unit.")
     if not getattr(officer, "is_authenticated", False) or officer.role != User.Role.CALL_CENTER_STAFF:
         raise ValidationError("Only an officer may assign or reassign work.")
     if technician is not None:

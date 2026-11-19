@@ -1,9 +1,11 @@
+from datetime import timedelta
 from io import BytesIO
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from accounts.models import Building, Unit, UnitKind, User
@@ -69,6 +71,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             report_id=report.pk,
             actor=self.officer,
             expected_version=report.version,
+            room_verified=True,
         )
         return assign_technician(
             report_id=report.pk,
@@ -110,6 +113,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             report_id=report.pk,
             actor=self.officer,
             expected_version=report.version,
+            room_verified=True,
         )
         self.assertEqual(
             StatusHistory.objects.filter(report=report).latest("pk").new_status,
@@ -137,12 +141,12 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
             completion_notes="Replaced the damaged pipe and tested the sink.",
         )
         report.refresh_from_db()
-        self.assertEqual(report.status, Report.Status.COMPLETED)
+        self.assertEqual(report.status, Report.Status.CLOSED)
         assignment.refresh_from_db()
         self.assertFalse(assignment.is_active)
         self.assertTrue(
             Notification.objects.filter(
-                report=report, message__contains="ready for verification"
+                report=report, message__contains="automatically closed after completion"
             ).exists()
         )
 
@@ -162,7 +166,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.assertEqual(StatusHistory.objects.filter(report=report).count(), 6)
         self.assertTrue(
             Notification.objects.filter(
-                report=report, message__contains="verified and closed"
+                report=report, message__contains="automatically closed after completion"
             ).exists()
         )
 
@@ -173,7 +177,7 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
 
         reopen_report(
             report_id=report.pk,
-            resident=self.resident,
+            actor=self.resident,
             expected_version=report.version,
             reason="The sink is still leaking.",
         )
@@ -200,6 +204,26 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         self.assertEqual(assignments[0].technician, self.technician)
         self.assertTrue(assignments[1].is_active)
         self.assertEqual(assignments[1].technician, self.other_technician)
+
+    def test_reopen_is_rejected_after_three_day_window(self):
+        report = self.create_report()
+        self.complete_report(report)
+        report.refresh_from_db()
+        Assignment.objects.filter(report=report).update(
+            completed_at=timezone.now() - timedelta(days=4)
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            reopen_report(
+                report_id=report.pk,
+                actor=self.resident,
+                expected_version=report.version,
+                reason="The repair still needs attention.",
+            )
+
+        self.assertEqual(error.exception.code, "reopen_window_closed")
+        report.refresh_from_db()
+        self.assertEqual(report.status, Report.Status.CLOSED)
 
     def test_only_active_assigned_technician_can_open_work_order_or_start_work(self):
         report = self.create_report()
@@ -268,12 +292,12 @@ class TechnicianAndVerificationWorkflowTests(TestCase):
         with self.assertRaises(ValidationError):
             reopen_report(
                 report_id=report.pk,
-                resident=self.other_resident,
+                actor=self.other_resident,
                 expected_version=report.version,
                 reason="Not my report.",
             )
         report.refresh_from_db()
-        self.assertEqual(report.status, Report.Status.COMPLETED)
+        self.assertEqual(report.status, Report.Status.CLOSED)
         self.assertFalse(Verification.objects.filter(report=report).exists())
 
     def test_all_staff_comments_are_visible_to_residents(self):

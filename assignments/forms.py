@@ -2,7 +2,7 @@ from django import forms
 from django.conf import settings
 from django.db.models import Count, Q
 
-from accounts.models import Building, User
+from accounts.models import Building, Unit, User
 from reports.models import Category, Report
 
 
@@ -12,7 +12,8 @@ class TechnicianChoiceField(forms.ModelChoiceField):
 
 
 class AssignTechnicianForm(forms.Form):
-    technician = TechnicianChoiceField(queryset=User.objects.none())
+    unit = forms.ModelChoiceField(queryset=Unit.objects.none())
+    technician = TechnicianChoiceField(queryset=User.objects.none(), required=False)
     priority = forms.ChoiceField(
         choices=settings.PRIORITY_CHOICES, required=False
     )
@@ -20,10 +21,24 @@ class AssignTechnicianForm(forms.Form):
 
     def __init__(self, *args, report, **kwargs):
         super().__init__(*args, **kwargs)
-        suggested_unit = report.subcategory.default_unit if report.subcategory and report.subcategory.default_unit_id else report.category.default_unit
-        technician_queryset = User.objects.filter(role=User.Role.TECHNICIAN_CONTRACTOR, is_active=True)
-        if suggested_unit is not None:
-            technician_queryset = technician_queryset.filter(unit=suggested_unit)
+        suggested_unit = (
+            report.subcategory.default_unit
+            if report.subcategory and report.subcategory.default_unit_id
+            else report.category.default_unit
+        )
+        self.fields["unit"].queryset = Unit.objects.filter(is_active=True)
+        self.fields["unit"].initial = suggested_unit
+        selected_unit_id = (
+            self.data.get("unit")
+            if self.is_bound
+            else getattr(suggested_unit, "pk", None)
+        )
+        technician_queryset = User.objects.filter(
+            role=User.Role.TECHNICIAN_CONTRACTOR,
+            is_active=True,
+        )
+        if selected_unit_id:
+            technician_queryset = technician_queryset.filter(unit_id=selected_unit_id)
         self.fields["technician"].queryset = (
             technician_queryset
             .annotate(
@@ -42,8 +57,20 @@ class AssignTechnicianForm(forms.Form):
         self.fields["priority"].label = "Priority"
         self.fields["version"].initial = report.version
 
+    def clean(self):
+        cleaned_data = super().clean()
+        unit = cleaned_data.get("unit")
+        technician = cleaned_data.get("technician")
+        if technician and unit and technician.unit_id != unit.pk:
+            self.add_error("technician", "Choose a technician from the selected unit.")
+        return cleaned_data
+
 
 class ReviewReportForm(forms.Form):
+    room_verified = forms.BooleanField(
+        required=True,
+        label="I confirm the room and building match this request",
+    )
     version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
 
     def __init__(self, *args, report, **kwargs):
@@ -51,25 +78,11 @@ class ReviewReportForm(forms.Form):
         self.fields["version"].initial = report.version
 
 class RejectReportForm(forms.Form):
-    reason = forms.CharField(max_length=500, widget=forms.Textarea(attrs={"rows": 3}))
+    reason = forms.CharField(max_length=400, widget=forms.Textarea(attrs={"rows": 3}))
     version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
 
     def __init__(self, *args, report, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["version"].initial = report.version
-
-
-class DuplicateReportForm(forms.Form):
-    master_report = forms.ModelChoiceField(queryset=Report.objects.none())
-    version = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
-
-    def __init__(self, *args, report, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["master_report"].queryset = (
-            Report.objects.exclude(pk=report.pk)
-            .exclude(status=Report.Status.REJECTED)
-            .order_by("-created_at")
-        )
         self.fields["version"].initial = report.version
 
 
@@ -83,6 +96,9 @@ class SetPriorityForm(forms.Form):
 
 
 class OfficerQueueFilterForm(forms.Form):
+    ticket_no = forms.CharField(max_length=30, required=False, label="Ticket number")
+    student_id = forms.CharField(max_length=50, required=False, label="Student ID")
+    room = forms.CharField(max_length=100, required=False, label="Room")
     status = forms.ChoiceField(
         choices=(("", "All statuses"), *Report.Status.choices),
         required=False,

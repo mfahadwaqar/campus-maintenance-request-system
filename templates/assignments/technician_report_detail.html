@@ -51,6 +51,25 @@
         </section>
     {% endif %}
 
+    {% if hold_form %}
+        <section>
+            <h2>Put work on hold</h2>
+            <form method="post" action="{% url 'assignments:put_on_hold' report.id %}">
+                {% csrf_token %}
+                {{ hold_form.version }}
+                {% if hold_form.non_field_errors %}<div class="error-message" role="alert">{{ hold_form.non_field_errors }}</div>{% endif %}
+                {% for field in hold_form.visible_fields %}
+                    <div class="form-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
+                    </div>
+                {% endfor %}
+                <button type="submit">Notify resident and put on hold</button>
+            </form>
+        </section>
+    {% endif %}
+
     {% if report.photos.all %}
         <h2>Photos</h2>
         <ul>
