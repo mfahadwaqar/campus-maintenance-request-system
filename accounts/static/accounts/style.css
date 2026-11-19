@@ -317,3 +317,5 @@ textarea { height: 7rem; }
 .photo-list .photo-item { display: flex; flex-direction: column; gap: 0.3rem; max-width: 220px; }
 .photo-thumb { display: block; max-width: 220px; max-height: 180px; border-radius: 8px; border: 1.5px solid var(--line); object-fit: cover; }
 .photo-save { font-size: 0.85rem; }
+.photo-list .photo-item a { padding: 0; border: 0; border-radius: 0; background: none; }
+.photo-list .photo-item a:hover span { text-decoration: underline; }
