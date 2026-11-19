@@ -235,3 +235,17 @@ class AuthApiTests(TestCase):
         response = Client().get("/login/", HTTP_ORIGIN=FRONTEND)
 
         self.assertNotIn("Access-Control-Allow-Origin", response)
+
+    def test_auth_endpoints_are_listed_in_the_api_schema(self):
+        response = APIClient().get("/api/schema/?format=json")
+
+        self.assertEqual(response.status_code, 200)
+        paths = response.json()["paths"]
+        for path in (
+            "/accounts/csrf/",
+            "/api/auth/login/",
+            "/api/auth/logout/",
+            "/api/auth/me/",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, paths)

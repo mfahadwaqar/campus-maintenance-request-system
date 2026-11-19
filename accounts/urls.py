@@ -6,7 +6,7 @@ from . import api, views
 app_name = "accounts"
 
 urlpatterns = [
-    path("accounts/csrf/", api.csrf_cookie, name="csrf"),
+    path("accounts/csrf/", api.CsrfCookieAPIView.as_view(), name="csrf"),
     path("", views.dashboard_redirect, name="home"),
     path("login/", views.RoleLoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),

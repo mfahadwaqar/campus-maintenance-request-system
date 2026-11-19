@@ -1,28 +1,26 @@
-"""JSON authentication endpoints for the React front end.
+"""JSON authentication endpoints for API clients (endpoints 1 to 3 of the specification).
 
-The front end runs on its own origin, so it signs in with the Django session
-cookie plus a CSRF token:
+A client on its own origin signs in with the Django session cookie plus a CSRF
+token:
 
 1. ``GET /accounts/csrf/`` sets the ``csrftoken`` cookie and returns the token
    in the body as well, because the cookie may be HttpOnly in production.
 2. ``POST /api/auth/login/`` takes ``{"email", "password"}`` and the
    ``X-CSRFToken`` header, and answers 204 with the ``sessionid`` cookie.
-3. ``GET /api/auth/me/`` tells the front end who is signed in and in what role.
+3. ``GET /api/auth/me/`` tells the client who is signed in and in what role.
 4. ``POST /api/auth/logout/`` clears the session.
 """
 
-import json
-
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
-from django.views import View
 from django.views.csrf import csrf_failure as default_csrf_failure
-from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.views.decorators.csrf import ensure_csrf_cookie
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import serializers
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -43,31 +41,61 @@ def csrf_failure(request, reason="", template_name=None):
     return default_csrf_failure(request, reason=reason)
 
 
-@ensure_csrf_cookie
-def csrf_cookie(request):
+@method_decorator(ensure_csrf_cookie, name="dispatch")
+class CsrfCookieAPIView(APIView):
     """GET /accounts/csrf/: set the CSRF cookie and echo the token."""
-    return JsonResponse({"detail": "CSRF cookie set", "csrfToken": get_token(request)})
+
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
+
+    @extend_schema(
+        operation_id="auth_csrf",
+        responses={200: inline_serializer("CsrfCookie", {"detail": serializers.CharField(), "csrfToken": serializers.CharField()})},
+        description=(
+            "Set the csrftoken cookie. The token is also returned in the body because "
+            "the cookie may be HttpOnly in production. Send it back as X-CSRFToken on "
+            "every POST, PATCH and DELETE."
+        ),
+    )
+    def get(self, request):
+        return Response({"detail": "CSRF cookie set", "csrfToken": get_token(request)})
 
 
-@method_decorator(csrf_protect, name="dispatch")
-class LoginView(View):
+class LoginRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(style={"input_type": "password"})
+
+
+class LoginAPIView(APIView):
     """POST /api/auth/login/: sign in with email and password."""
 
-    http_method_names = ["post", "options"]
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
 
+    @extend_schema(
+        operation_id="auth_login",
+        request=LoginRequestSerializer,
+        responses={
+            204: None,
+            400: OpenApiResponse(description="Email or password missing."),
+            401: OpenApiResponse(description="Invalid email or password."),
+            403: OpenApiResponse(description="CSRF token missing or wrong."),
+        },
+        description=(
+            "Sign in with the account email and password. Requires the X-CSRFToken "
+            "header from /accounts/csrf/. Success returns 204 and sets the HttpOnly "
+            "sessionid cookie."
+        ),
+    )
     def post(self, request):
-        try:
-            payload = json.loads(request.body or b"{}")
-        except (ValueError, UnicodeDecodeError):
-            return JsonResponse({"detail": "Send a JSON body."}, status=400)
+        SessionAuthentication().enforce_csrf(request)  # 403 JSON when the token is wrong
+        payload = request.data
         if not isinstance(payload, dict):
-            return JsonResponse({"detail": "Send a JSON object."}, status=400)
+            return Response({"detail": "Send a JSON object."}, status=400)
         email = str(payload.get("email") or "").strip()
         password = str(payload.get("password") or "")
         if not email or not password:
-            return JsonResponse(
-                {"detail": "Email and password are required."}, status=400
-            )
+            return Response({"detail": "Email and password are required."}, status=400)
         account = User.objects.filter(email__iexact=email).first()
         user = (
             authenticate(request, username=account.get_username(), password=password)
@@ -75,9 +103,9 @@ class LoginView(View):
             else None
         )
         if user is None or not user.is_active:
-            return JsonResponse({"detail": "Invalid email or password."}, status=401)
+            return Response({"detail": "Invalid email or password."}, status=401)
         login(request, user)
-        return HttpResponse(status=204)
+        return Response(status=204)
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
