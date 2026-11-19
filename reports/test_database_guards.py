@@ -2,6 +2,7 @@ from django.db import DatabaseError, connection, transaction
 from django.test import TestCase
 
 from accounts.models import Building, Unit, User
+
 from .models import Category, Report, StatusHistory
 from .services import (
     apply_transition,

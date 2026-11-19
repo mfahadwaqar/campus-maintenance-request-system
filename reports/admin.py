@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Category, Comment, Photo, Report, StatusHistory, Subcategory, Verification
+from .models import (
+    Category,
+    Comment,
+    Photo,
+    Report,
+    StatusHistory,
+    Subcategory,
+    Verification,
+)
 
 
 @admin.register(Category)

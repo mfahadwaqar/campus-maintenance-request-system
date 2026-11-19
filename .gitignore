@@ -9,3 +9,6 @@ private_uploads/
 .cache/
 .coverage
 coverage.xml
+htmlcov/
+.pytest_cache/
+.private_uploads/

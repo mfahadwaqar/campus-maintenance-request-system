@@ -1,17 +1,18 @@
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
 from django.utils import timezone
-from assignments.models import Assignment
+from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from assignments.models import Assignment
+
 from .forms import (
     CommentForm,
     ReopenReportForm,
@@ -204,7 +205,8 @@ def photo_download(request, report_id, photo_id):
     content_type = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
     return FileResponse(
         photo.file.open("rb"),
-        as_attachment=True,
+        # Shown inline so <img> tags on the work-order pages display it; ?download=1 saves it.
+        as_attachment=request.GET.get("download") == "1",
         filename=filename,
         content_type=content_type,
     )

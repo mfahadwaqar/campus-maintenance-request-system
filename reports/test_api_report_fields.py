@@ -13,7 +13,7 @@ from rest_framework.test import APITestCase
 from accounts.models import Building, RoomLocation, Unit, UnitKind, User
 from assignments.models import Assignment
 
-from .models import Category, Photo, Report
+from .models import Category, Photo
 from .services import (
     assign_technician,
     complete_work,

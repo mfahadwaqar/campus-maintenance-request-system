@@ -4,7 +4,6 @@ from django.db import transaction
 from accounts.models import Building, Unit, UnitKind
 from reports.models import Category, Subcategory
 
-
 DORMS_BY_ZONE = {
     "Zone 1": ("A", "B", "C", "D", "F", "G", "H"),
     "Zone 2": ("E", "J", "K"),

@@ -1,16 +1,14 @@
-from django.core.exceptions import ValidationError
-from django.test import TestCase
-
-from accounts.models import Building, User
-from notifications.models import Notification
-from io import BytesIO
 from datetime import date, timedelta
+from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
 from PIL import Image
 
-from accounts.models import Unit, UnitKind
+from accounts.models import Building, Unit, UnitKind, User
 from assignments.models import Assignment
+from notifications.models import Notification
+
 from .models import Category, Comment, Photo, Report, StatusHistory
 from .services import (
     add_comment,

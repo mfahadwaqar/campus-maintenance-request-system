@@ -15,6 +15,7 @@
             <div class="form-field">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
+                {% if field.errors %}<div class="error-message" role="alert">{{ field.errors }}</div>{% endif %}
             </div>
         {% endfor %}
         <button type="submit">Filter requests</button>

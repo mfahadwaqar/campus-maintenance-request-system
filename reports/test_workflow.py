@@ -12,6 +12,7 @@ from PIL import Image
 from accounts.models import Building, Unit, UnitKind, User
 from assignments.models import Assignment
 from notifications.models import Notification
+
 from .models import Category, Comment, Photo, Report, StatusHistory, Verification
 from .services import (
     add_comment,

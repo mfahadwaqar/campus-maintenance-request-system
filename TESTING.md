@@ -17,7 +17,7 @@ Test data: building **Dormitory A**, room **A101**. Bad room: **A999**.
 ---
 
 ## 1. Resident submits (`demo_resident_01`)
-- [ ] **New request**: category, subcategory, Dormitory A, A101, tick the room confirmation, title, description, urgency → Submit. Ticket `MR-2026-…` appears, status **Submitted**. 📷 form + ticket page
+- [ ] **New request**: category, subcategory, Dormitory A, A101, tick the room confirmation, title, description, urgency → Submit. Ticket `CMR-2026-…` appears, status **Submitted**. 📷 form + ticket page
 - [ ] Submit again with room **A999** → room error, no ticket.
 - [ ] Submit with a photo → ticket lists the photo.
 - [ ] **My requests** shows only your tickets. 📷

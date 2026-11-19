@@ -1,6 +1,6 @@
 import os
 
-from .base import *  # noqa: F403
+from .base import *
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 if not SECRET_KEY:
@@ -14,7 +14,7 @@ ALLOWED_HOSTS = [
 if not ALLOWED_HOSTS:
     raise RuntimeError("DJANGO_ALLOWED_HOSTS must contain at least one host.")
 
-CSRF_TRUSTED_ORIGINS = list(FRONTEND_ORIGINS) + [  # noqa: F405
+CSRF_TRUSTED_ORIGINS = list(FRONTEND_ORIGINS) + [
     origin.strip()
     for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()

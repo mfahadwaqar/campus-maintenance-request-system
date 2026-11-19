@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 
 from .models import RoomLocation
 
-
 DORM_FLOORS = {
     "A": 4, "B": 4, "C": 4, "D": 4, "F": 4, "G": 4, "H": 4,
     "E": 3, "J": 3, "K": 3,

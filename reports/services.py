@@ -1,17 +1,25 @@
 from dataclasses import dataclass
 
-from django.core.exceptions import ValidationError
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
 from assignments.models import Assignment
 from notifications.services import queue_report_notifications
-from .models import AllowedTransition, Channel, Comment, Photo, Report, StatusHistory, Verification
+
+from .models import (
+    AllowedTransition,
+    Channel,
+    Comment,
+    Photo,
+    Report,
+    StatusHistory,
+    Verification,
+)
 from .photo_pipeline import validate_and_reencode_photo
 from .storage import private_photo_storage
-from .transitions import seed_allowed_transitions
 
 
 class ReportConflict(Exception):
@@ -610,13 +618,18 @@ def reopen_report(
     if completion_assignment is None:
         raise ValidationError("No completed assignment exists for reopening verification.")
     if actor.role == User.Role.RESIDENT:
-        Verification.objects.create(
+        # One verification row exists per completed assignment. A resident who already
+        # verified the work and then reopens it replaces that row, instead of creating a
+        # second one that the database would refuse.
+        Verification.objects.update_or_create(
             report=report,
-            resident=actor,
             assignment=completion_assignment,
-            outcome=Verification.Outcome.REOPENED,
-            rating=None,
-            comment=reason,
+            defaults={
+                "resident": actor,
+                "outcome": Verification.Outcome.REOPENED,
+                "rating": None,
+                "comment": reason,
+            },
         )
     return reopened
 

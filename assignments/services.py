@@ -2,8 +2,9 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Assignment, EndReason
 from accounts.models import User
+
+from .models import Assignment, EndReason
 
 
 def _validate_assignment(unit, technician, officer):

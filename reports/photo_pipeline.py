@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-
 ALLOWED_IMAGE_FORMATS = {
     ".jpg": ("JPEG", "image/jpeg", "JPEG"),
     ".jpeg": ("JPEG", "image/jpeg", "JPEG"),

@@ -11,6 +11,7 @@ from django.utils import timezone
 from PIL import Image
 
 from accounts.models import Building, RoomLocation, Unit, UnitKind, User
+
 from .models import Category, Comment, Photo, Report, StatusHistory
 from .services import add_comment, apply_transition
 
@@ -234,7 +235,7 @@ class ReportSubmissionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/jpeg")
-        self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
+        self.assertTrue(response["Content-Disposition"].startswith("inline;"))
 
     def test_description_with_script_markup_renders_as_text(self):
         self.submit_report(description="<script>window.alert(1)</script>")

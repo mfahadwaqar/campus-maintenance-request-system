@@ -1,6 +1,6 @@
 import re
-from pathlib import Path
 from html import unescape
+from pathlib import Path
 
 from django.test import SimpleTestCase
 
