@@ -2,7 +2,7 @@
    Tokens first, then base, layout, components, page-specific bits. */
 
 :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --paper: #f6efe6;
     --card: #fffaf3;
     --line: #e6d8c3;
@@ -271,38 +271,6 @@ textarea { height: 7rem; }
 /* PS4 prototype screenshots */
 .proto-shot { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
 
-/* ---------- Dark theme (follows the system setting) ---------- */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --paper: #16110c;
-        --card: #211a13;
-        --surface: #2a2118;
-        --line: #3d3125;
-        --ink: #f3e9db;
-        --muted: #b9a891;
-        --link: #5eead4;
-        --highlight: #3a2415;
-        --pill: #3d3125;
-    }
-    .status-submitted { background: #1e2a4d; color: #a9c1ff; }
-    .status-under_review { background: #26264f; color: #b6b9ff; }
-    .status-assigned { background: #123b37; color: #7ee2cf; }
-    .status-in_progress { background: #0f3a45; color: #67dcf0; }
-    .status-on_hold { background: #2b3340; color: #b4c0d0; }
-    .status-completed { background: #153d22; color: #7ee59b; }
-    .status-closed { background: #34302c; color: #cbc4bd; }
-    .status-reopened { background: #4a2511; color: #ffb27d; }
-    .status-rejected { background: #4a1a1a; color: #ffa3a3; }
-    .alert-success, .status-message { background: #12351f; border-color: #1f5d37; color: #a5e8bd; }
-    .alert-error { background: #3d1717; border-color: #6d2a2a; color: #ffbcbc; }
-    .alert-warning, .alert-info { background: #3a2a10; border-color: #6a4c1c; color: #ffd9a0; }
-    .journey li.current .dot { box-shadow: 0 0 0 4px #5a2c12; }
-    .journey li.alert-step .dot { box-shadow: 0 0 0 4px #2b3340; }
-    .pending { background: #3a2a10; }
-    .master-summary { background: #17413d; }
-    .reopened-label { color: #ffb27d; }
-    .proto-shot { opacity: 0.95; }
-}
 
 /* ---------- Queue summary tiles and age tag ---------- */
 .summary-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
@@ -333,3 +301,8 @@ textarea { height: 7rem; }
 .notice-hold h2 { margin-top: 0; }
 .reopen-window { margin: 1rem 0 0; padding: 0.6rem 0.9rem; border-radius: 8px; background: var(--teal-soft); }
 .reopen-window.expired { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+
+/* Safety note on the resident dashboard, and spacing under the action cards */
+.notice { margin-top: 1.5rem; padding: 1rem 1.25rem; border-radius: var(--radius); background: var(--highlight); border-left: 4px solid var(--terra); }
+.notice h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.notice p { margin: 0.25rem 0; }
