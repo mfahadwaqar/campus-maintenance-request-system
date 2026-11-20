@@ -266,3 +266,16 @@ class AllowedTransition(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=("from_status", "to_status", "actor_role"), name="allowed_transition_unique")]
+
+
+class StoredPhotoFile(models.Model):
+    """One uploaded photo kept in the database, used when PHOTO_STORAGE=database (no persistent disk)."""
+
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    size_bytes = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+

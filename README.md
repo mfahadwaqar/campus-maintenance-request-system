@@ -150,6 +150,9 @@ The production settings force secure cookies. If the server is served over plain
 
 `docker-compose.yml` and the `nginx/` folder describe the server setup.
 
+For a free deployment on Render with a Neon database (photos are kept in the database), follow
+[docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md).
+
 ## Notes
 
 - Student Village room codes (for example `SV04A1`) are accepted in a provisional format that

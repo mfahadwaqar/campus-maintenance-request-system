@@ -31,3 +31,16 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "31536000"))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+
+
+# Static files are served by the application itself (WhiteNoise), so no separate web server is needed.
+MIDDLEWARE = list(MIDDLEWARE)
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
+
+# The host's health check calls /health/ over plain http inside its network.
+SECURE_REDIRECT_EXEMPT = [r"^health/$"]
+

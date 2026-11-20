@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from campus_maintainance_request_system.dburl import database_settings
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
@@ -59,17 +61,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "campus_maintainance_request_system.wsgi.application"
 ASGI_APPLICATION = "campus_maintainance_request_system.asgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "campus_maintenance"),
-        "USER": os.environ.get("POSTGRES_USER", "campus"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
-    }
-}
+DATABASES = {"default": database_settings(os.environ)}
 
 AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "accounts:login"
@@ -155,6 +147,7 @@ LOGGING = {
 PRIVATE_MEDIA_ROOT = Path(
     os.environ.get("PRIVATE_MEDIA_ROOT", BASE_DIR.parent / "private_uploads")
 )
+PHOTO_STORAGE = os.environ.get("PHOTO_STORAGE", "filesystem").lower()
 MAX_PHOTO_SIZE = int(os.environ.get("MAX_PHOTO_SIZE", str(5 * 1024 * 1024)))
 MAX_PHOTO_WIDTH = int(os.environ.get("MAX_PHOTO_WIDTH", "4096"))
 MAX_PHOTO_HEIGHT = int(os.environ.get("MAX_PHOTO_HEIGHT", "4096"))
